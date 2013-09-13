@@ -1,13 +1,22 @@
-var spawn = require('child_process').spawn,
-    grep  = spawn('grep', ['master', 'slave.js']);
+var runGrep = function (expression, filename) {
+  var spawn = require('child_process').spawn;
+  grep  = spawn('grep', [expression.toString('utf-8'), filename.toString('utf-8')]);
 
-grep.stdout.on('data', function (data) {
-  console.log('stdout: ' + data);
-});
-grep.stderr.on('data', function (data) {     
-  console.log('stderr: ' + data);
-});
+  grep.stdout.on('data', function (data) {
+    console.log(data.toString('utf-8'));
+  });
 
-grep.on('close', function (code) {
-  
-});
+  grep.stderr.on('data', function (data) {
+    console.log(data.toString('utf-8'));
+  });
+
+  grep.on('close', function (code) { });
+
+}
+
+if (require.main === module) {
+  runGrep();
+}
+else {
+  exports.runGrep = runGrep;
+}

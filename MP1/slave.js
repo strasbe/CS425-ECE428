@@ -2,27 +2,35 @@ var masterPort = 8000;
 
 var net = require('net');
 var exitFunc, listenOnPort, serverConnect;
-var prompt = require('./prompt');
+var commandLine = require('./prompt');
+var runGrep = require('./runGrep');
 var receivedGrep, slave;
 
+/* Connects to Master server and handles data from Master*/
 serverConnect = function () {
-    slave = net.connect({port: masterPort}, function () { //'connect' listener
-        console.log('Slave Connected');
-        slave.write('Slave: Slave Connected');
-        prompt.prompt(receivedGrep);
-    });
+  slave = net.connect({port: masterPort}, function () { //'connect' listener
+    console.log('Slave Connected');
+    slave.write('Slave: Slave Connected\r\n');
+    commandLine.prompt(receivedGrep);
+  });
 
-    slave.on('data', function(data) {
-        console.log(data.toString('utf-8'));
-    });
+  /* If Master sends a valid grep command, run grep*/
+  slave.on('data', function(data) {
+    var match;
+    var regex = /^Master: grep (.*) (.*)/;
+    if (match = regex.exec(data))
+      runGrep.runGrep(match[1], match[2]);
+  });
 
-    slave.on('end', function() {
-        console.log('Client Disconnected');
-    });
+  /* Disconnect from Master*/
+  slave.on('end', function() {
+    console.log('Client Disconnected');
+  });
 }
 
+/* If a grep command was entered in the prompt, tell Master */
 receivedGrep = function (cmd) {
-    slave.write('Slave: ' + cmd);
+  slave.write('Slave: ' + cmd + '\r\n');
 };
 
 serverConnect();
