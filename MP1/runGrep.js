@@ -1,7 +1,7 @@
-var runGrep = function (expression, filename) {
+var runGrep = function (cmd) {
   var spawn = require('child_process').spawn;
   var colors = require('colors');
-  grep  = spawn('grep', ['--color=auto', expression.toString('utf-8'), filename.toString('utf-8')]);
+  grep  = spawn('grep', ['--color=auto', cmd.toString('utf-8'), 'machine.1.log']);
 
   grep.stdout.on('data', function (data) {
     var data = data.toString('utf-8');

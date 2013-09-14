@@ -1,42 +1,47 @@
 var readline = require('readline');
+var util = require('util');
+var EventEmitter = require('events').EventEmitter;
 
-function Prompt(cb) {
-  this.cb = cb || function () { };
-
+function Prompt() {
   this.initialize();
   this.setupEvents();
 }
 
-Prompt.prototype = {
-  initialize: function () {
-    this.rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-  },
+util.inherits(Prompt, EventEmitter);
 
-  setupEvents: function () {
-    var self = this;
-    this.rl.on('line', function (cmd) {
-      self.receivedCmd(cmd);
-    });
-  },
+Prompt.prototype.initialize = function () {
+  this.rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+};
 
-  receivedCmd: function (cmd) {
-    var grepRegEx = /^grep.*/;
-    var exitRegEx = /^exit.*/;
-    if (grepRegEx.test(cmd) || exitRegEx.test(cmd)) {
-      this.cb(cmd);
-    }
-    else {
-      console.log('Usage: grep [OPTION]... PATTERN [FILE]...');
-    }
-    this.prompt();
-  },
+Prompt.prototype.setupEvents = function () {
+  var self = this;
+  this.rl.on('line', function (cmd) {
+    self.receivedCmd(cmd);
+  });
+};
 
-  prompt: function () {
-    this.rl.prompt();
+Prompt.prototype.receivedCmd = function (cmd) {
+  var grepRegEx = /^grep (.*)/;
+  var exitRegEx = /^exit.*/;
+  var match = grepRegEx.exec(cmd);
+
+  if (match && match[1]) {
+    this.emit('grep', match[1]);
   }
+  else if (exitRegEx.test(cmd)) {
+    this.emit('exit', cmd);
+  }
+  else {
+    console.log('Usage: grep [OPTION]...');
+  }
+  this.prompt();
+};
+
+Prompt.prototype.prompt = function () {
+  this.rl.prompt();
 };
 
 if (require.main === module) {

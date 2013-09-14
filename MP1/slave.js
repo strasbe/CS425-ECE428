@@ -12,12 +12,7 @@ function Slave() {
 Slave.prototype = {
   initialize: function () {
     var self = this;
-    this.commandLine = new Prompt(function (cmd) {
-      var match = self.checkForGrep(cmd);
-      if (match) {
-        self.receivedGrep(match[1], match[2]);
-      }
-    });
+    this.commandLine = new Prompt();
   },
 
   connect: function () {
@@ -32,9 +27,10 @@ Slave.prototype = {
     var self = this;
     /* If Master sends a valid grep command, run grep */
     this.connection.on('data', function (data) {
-      var match = self.checkForGrep(data);
+      data = data.toString('utf-8');
+      var match = self.checkReceivedForGrep(data);
       if (match) {
-        self.receivedGrep(match[1], match[2]);
+        self.receivedGrep(match[1]);
       }
       else{
         console.log(data);
@@ -44,15 +40,20 @@ Slave.prototype = {
     this.connection.on('end', function() {
       console.log('Disconnected from Master');
     });
+
+    this.commandLine.on('grep', function (cmd) {
+      self.connection.write('grep ' + cmd);
+      runGrep.runGrep(cmd);
+    });
   },
 
-  checkForGrep: function (cmd) {
-    var regex = /^grep (.*) (.*)/;
+  checkReceivedForGrep: function (cmd) {
+    var regex = /^grep (.*)/;
     return regex.exec(cmd);
   },
 
-  receivedGrep: function (expression, filename) {
-    runGrep.runGrep(expression, filename);
+  receivedGrep: function (cmd) {
+    runGrep.runGrep(cmd);
   }
 }
 
