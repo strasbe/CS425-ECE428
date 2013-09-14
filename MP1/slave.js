@@ -23,7 +23,7 @@ Slave.prototype = {
   connect: function () {
     var self = this;
     this.connection = net.connect({port: masterPort}, function () {
-      console.log('Conencted to Master');
+      console.log('Connected to Master');
       self.commandLine.prompt();
     });
   },
@@ -35,6 +35,9 @@ Slave.prototype = {
       var match = self.checkForGrep(data);
       if (match) {
         self.receivedGrep(match[1], match[2]);
+      }
+      else{
+        console.log(data);
       }
     });
 

@@ -23,8 +23,9 @@ Prompt.prototype = {
   },
 
   receivedCmd: function (cmd) {
-    var regEx = /^grep.*/;
-    if (regEx.test(cmd)) {
+    var grepRegEx = /^grep.*/;
+    var exitRegEx = /^exit.*/;
+    if (grepRegEx.test(cmd) || exitRegEx.test(cmd)) {
       this.cb(cmd);
     }
     else {
