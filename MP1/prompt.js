@@ -1,29 +1,46 @@
-var prompt = function (cb) {
-  var readline = require('readline');
-  cb = cb || function () { };
+var readline = require('readline');
 
-  var rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+function Prompt(cb) {
+  this.cb = cb || function () { };
 
-  rl.prompt();
+  this.initialize();
+  this.setupEvents();
+}
 
-  rl.on('line', function (cmd) {
+Prompt.prototype = {
+  initialize: function () {
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+  },
+
+  setupEvents: function () {
+    var self = this;
+    this.rl.on('line', function (cmd) {
+      self.receivedCmd(cmd);
+    });
+  },
+
+  receivedCmd: function (cmd) {
     var regEx = /^grep.*/;
     if (regEx.test(cmd)) {
-      cb(cmd);
+      this.cb(cmd);
     }
     else {
       console.log('Usage: grep [OPTION]... PATTERN [FILE]...');
     }
-    rl.prompt();
-  });
-}
+    this.prompt();
+  },
+
+  prompt: function () {
+    this.rl.prompt();
+  }
+};
 
 if (require.main === module) {
-  prompt();
+  new Prompt().prompt();
 }
 else {
-  exports.prompt = prompt;
+  module.exports = Prompt;
 }

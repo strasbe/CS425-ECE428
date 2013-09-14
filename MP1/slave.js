@@ -1,36 +1,57 @@
+var net = require('net');
+var Prompt = require('./prompt');
+var runGrep = require('./runGrep');
 var masterPort = 8000;
 
-var net = require('net');
-var exitFunc, listenOnPort, serverConnect;
-var commandLine = require('./prompt');
-var runGrep = require('./runGrep');
-var receivedGrep, slave;
-
-/* Connects to Master server and handles data from Master*/
-serverConnect = function () {
-  slave = net.connect({port: masterPort}, function () { //'connect' listener
-    console.log('Slave Connected');
-    slave.write('Slave: Slave Connected\r\n');
-    commandLine.prompt(receivedGrep);
-  });
-
-  /* If Master sends a valid grep command, run grep*/
-  slave.on('data', function(data) {
-    var match;
-    var regex = /^Master: grep (.*) (.*)/;
-    if (match = regex.exec(data))
-      runGrep.runGrep(match[1], match[2]);
-  });
-
-  /* Disconnect from Master*/
-  slave.on('end', function() {
-    console.log('Client Disconnected');
-  });
+function Slave() {
+  this.initialize();
+  this.connect();
+  this.setupEvents();
 }
 
-/* If a grep command was entered in the prompt, tell Master */
-receivedGrep = function (cmd) {
-  slave.write('Slave: ' + cmd + '\r\n');
-};
+Slave.prototype = {
+  initialize: function () {
+    var self = this;
+    this.commandLine = new Prompt(function (cmd) {
+      var match = self.checkForGrep(cmd);
+      if (match) {
+        self.receivedGrep(match[1], match[2]);
+      }
+    });
+  },
 
-serverConnect();
+  connect: function () {
+    var self = this;
+    this.connection = net.connect({port: masterPort}, function () {
+      console.log('Slave Connected');
+      self.connection.write('Slave: Slave Connected\r\n');
+      self.commandLine.prompt();
+    });
+  },
+
+  setupEvents: function () {
+    var self = this;
+    /* If Master sends a valid grep command, run grep */
+    this.connection.on('data', function (data) {
+      var match = self.checkForGrep(data);
+      if (match) {
+        self.receivedGrep(match[1], match[2]);
+      }
+    });
+
+    this.connection.on('end', function() {
+      console.log('Disconnected from Master');
+    });
+  },
+
+  checkForGrep: function (cmd) {
+    var regex = /^grep (.*) (.*)/;
+    return regex.exec(cmd);
+  },
+
+  receivedGrep: function (expression, filename) {
+    runGrep.runGrep(expression, filename);
+  }
+}
+
+var slave = new Slave();
