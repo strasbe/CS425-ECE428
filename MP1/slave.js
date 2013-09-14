@@ -43,7 +43,10 @@ Slave.prototype = {
 
     this.commandLine.on('grep', function (cmd) {
       self.connection.write('grep ' + cmd);
-      runGrep.runGrep(cmd);
+      runGrep.runGrep(cmd, function (data) {
+        data = data.toString('utf-8');
+        console.log(data);
+      });
     });
   },
 
@@ -53,7 +56,10 @@ Slave.prototype = {
   },
 
   receivedGrep: function (cmd) {
-    runGrep.runGrep(cmd);
+    var self = this;
+    runGrep.runGrep(cmd, function (data) {
+      self.connection.write(data);
+    });
   }
 }
 

@@ -19,13 +19,12 @@ Master.prototype = {
 
   connect: function() {
     var self = this;
-    this.connection = net.createServer(function(c) {
+    this.server = net.createServer(function(connection) {
       console.log('Slave Connected');
-      self.slaves.push(c);
+      self.slaves.push(connection);
 
-      c.on('data', function(data) {
+      connection.on('data', function(data) {
         data = data.toString('utf-8');
-        console.log('here');
         var match = self.checkReceivedForGrep(data);
         if (match && match[1]) {
             self.receivedGrep(match[1]);
@@ -36,14 +35,14 @@ Master.prototype = {
         }
       });
 
-    c.on('end', function() {
+    connection.on('end', function() {
       console.log('Slave Disconnected');
     });
 
 
     });
 
-    this.connection.listen(masterport, function() {
+    this.server.listen(masterport, function() {
       console.log('Listening for slaves on port:', masterport);
       self.commandLine.prompt();
     });
@@ -53,7 +52,10 @@ Master.prototype = {
     var self = this;
     this.commandLine.on('grep', function (cmd) {
       self.broadcast(cmd);
-      runGrep.runGrep(cmd);
+      runGrep.runGrep(cmd, function (data) {
+        data = data.toString('utf-8');
+        console.log(data);
+      });
     });
 
   },
@@ -65,13 +67,16 @@ Master.prototype = {
 
   receivedGrep: function(cmd) {
     this.broadcast(cmd);
-    runGrep.runGrep(cmd);
+    runGrep.runGrep(cmd, function (data) {
+      data = data.toString('utf-8');
+      console.log('utf-8');
+    });
   },
 
   broadcast: function(cmd) {
     console.log(cmd);
-    this.slaves.forEach(function (c) {
-      c.write('grep '+ cmd);
+    this.slaves.forEach(function (connection) {
+      connection.write('grep '+ cmd);
     });
   }
 }
