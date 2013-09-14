@@ -23,8 +23,7 @@ Slave.prototype = {
   connect: function () {
     var self = this;
     this.connection = net.connect({port: masterPort}, function () {
-      console.log('Slave Connected');
-      self.connection.write('Slave: Slave Connected\r\n');
+      console.log('Conencted to Master');
       self.commandLine.prompt();
     });
   },
