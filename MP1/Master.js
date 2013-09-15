@@ -35,7 +35,7 @@ Master.prototype = {
             self.reply = connection;
             self.receivedGrep(match[1]);
         }
-        else if(self.reply != null){
+        else if (self.reply != null){
           /* Forward all data from other Slaves to slave that requested grep */
           self.reply.write(data);
         }
@@ -68,14 +68,14 @@ Master.prototype = {
   slaveDisconnect: function (lostConnection) {
     var index = null;
     for (var i = 0; i < this.slaves.length; i++) {
-      if( this.slaves[i] === lostConnection)
+      if (this.slaves[i] === lostConnection)
       {
         index = i;
         break;
       }
     }
     
-    if(index)
+    if (index)
     {
       this.slaves.splice(index,1);
     }
@@ -111,7 +111,7 @@ Master.prototype = {
     this.broadcast(cmd);
     runGrep.runGrep(cmd, function (data) {
       data = data.toString('utf-8');
-      if(self.reply != null)
+      if (self.reply != null)
         self.reply.write(data);
     });
   },
@@ -120,7 +120,7 @@ Master.prototype = {
   broadcast: function (cmd) {
     var self = this;
     this.slaves.forEach(function (connection) {
-      if ( connection != self.reply) {
+      if (connection != self.reply) {
         connection.write('grep '+ cmd);
       }
     });
