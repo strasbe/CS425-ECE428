@@ -5,11 +5,12 @@
   "main": "master.js",
   "dependencies": {
     "colors": "~0.6.2",
-    "mocha": "~1.12.1"
+    "mocha": "~1.12.1",
+    "chai": "~1.7.2"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "NODE_ENV=test ./node_modules/.bin/mocha --reporter spec ./tests/*.js"
   },
   "repository": {
     "type": "git",
