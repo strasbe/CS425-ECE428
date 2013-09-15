@@ -1,0 +1,27 @@
+{
+  "name": "Distributed-Logging",
+  "version": "0.0.1",
+  "description": "Distributed Logging System",
+  "main": "master.js",
+  "dependencies": {
+    "colors": "~0.6.2",
+    "mocha": "~1.12.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:strasbe/CS425-ECE428.git"
+  },
+  "keywords": [
+    "distributed",
+    "logging"
+  ],
+  "author": "strasbe1",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/strasbe/CS425-ECE428/issues"
+  }
+}
