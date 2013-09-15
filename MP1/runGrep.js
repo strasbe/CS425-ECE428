@@ -11,10 +11,6 @@ var runGrep = function (cmd, cb) {
   });
 
   grep.stderr.pipe(process.stdout);
-
-  grep.on('close', function (code, signal) {
-    // cb(output.trim());
-  });
 }
 
 if (require.main === module) {

@@ -41,7 +41,7 @@ Slave.prototype = {
     });
 
     this.connection.on('error', function (err) {
-      if (err.code === 'ECONNREFUSED') {
+      if (err.code === 'ECONNREFUSED' || err.code === 'EPIPE') {
           self.connect();
           self.setupEvents(true);
       }
