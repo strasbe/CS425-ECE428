@@ -35,7 +35,9 @@ Master.prototype = {
           self.reply.write(data);
         }
         else {
-          console.log(data);
+          // Writing grep output
+          // console.log(data);
+          process.stdout.write(data);
         }
       });
 
