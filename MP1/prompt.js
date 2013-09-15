@@ -17,6 +17,7 @@ Prompt.prototype.initialize = function () {
   this.rl.setPrompt('');
 };
 
+/* Every time a line is entered from keyboard, figure out command */
 Prompt.prototype.setupEvents = function () {
   var self = this;
   this.rl.on('line', function (cmd) {
@@ -24,16 +25,21 @@ Prompt.prototype.setupEvents = function () {
   });
 };
 
+/* Determines the command the user inputed in to the machine */
 Prompt.prototype.receivedCmd = function (cmd) {
   var grepRegEx = /^grep (\S*)(?:\s*)(\S*)$/;
   var exitRegEx = /^exit(?:\s*).*/;
+
   var match = grepRegEx.exec(cmd);
+
   if (match && match[1] && !match[2]) {
+    /* Check for only key value grep */
     var expression = '^' + match[1]+':.*';
     this.emit('grep', expression);
   }
   else if (match && match[1] && match[2])
   {
+    /* Check for both key and value grep */
     var expression = '^' + match[1]+':.*'+match[2]+'.*';
     this.emit('grep', expression);
   }
@@ -41,6 +47,7 @@ Prompt.prototype.receivedCmd = function (cmd) {
     this.emit('exit', cmd);
   }
   else {
+    /* If command is invalid, display usage */
     console.log('Usage: grep [Key]... [Value]...');
     this.prompt();
   }

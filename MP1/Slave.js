@@ -1,7 +1,8 @@
+var masterPort = 8000;
+
 var net = require('net');
 var Prompt = require('./prompt');
 var runGrep = require('./runGrep');
-var masterPort = 8000;
 
 function Slave() {
   this.initialize();
@@ -15,6 +16,7 @@ Slave.prototype = {
     this.commandLine = new Prompt();
   },
 
+  /* Connects Slave to Master */
   connect: function () {
     var self = this;
     this.connection = net.connect({port: masterPort}, function () {
@@ -24,8 +26,10 @@ Slave.prototype = {
     });
   },
 
+  /* All event handling */
   setupEvents: function (onlyConnection) {
     var self = this;
+
     /* If Master sends a valid grep command, run grep */
     this.connection.on('data', function (data) {
       data = data.toString('utf-8');
@@ -40,6 +44,7 @@ Slave.prototype = {
       }
     });
 
+    /* If Slave disconnects from Master, keep trying to reconnect */
     this.connection.on('error', function (err) {
       if (err.code === 'ECONNREFUSED' || err.code === 'EPIPE') {
           self.connect();
@@ -47,6 +52,7 @@ Slave.prototype = {
       }
     });
 
+    /* Only run Grep if there is a single connection between slave and Master */
     if (!onlyConnection) {
       this.commandLine.on('grep', function (cmd) {
         self.receivedGrepFromCommandLine(cmd);
@@ -54,10 +60,13 @@ Slave.prototype = {
     }
   },
 
+  /* If grep is entered locally on Slave machine */
   receivedGrepFromCommandLine: function (cmd) {
     if (!cmd) {
       throw new Error('Cmd cannot be empty, null or undefined');
     }    
+
+    /* Send Grep command to master and run locally */
     this.connection.write('grep ' + cmd);
     runGrep.runGrep(cmd, function (data) {
       data = data.toString('utf-8');
@@ -68,6 +77,7 @@ Slave.prototype = {
     });
   },
 
+  /* Check if the Master sent out a grep command */
   checkReceivedForGrep: function (cmd) {
     var regex = /^grep ([^ ]*)/;
     var match = regex.exec(cmd);
@@ -80,6 +90,7 @@ Slave.prototype = {
     }
   },
 
+  /* If Master sent out grep command, run grep and send results */
   receivedGrep: function (cmd) {
     var self = this;
     runGrep.runGrep(cmd, function (data) {
