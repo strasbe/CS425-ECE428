@@ -24,20 +24,26 @@ Prompt.prototype.setupEvents = function () {
 };
 
 Prompt.prototype.receivedCmd = function (cmd) {
-  var grepRegEx = /^grep (.*)/;
-  var exitRegEx = /^exit.*/;
+  var grepRegEx = /^grep (\S*)(?:\s*)(\S*)$/;
+  var exitRegEx = /^exit(?:\s*).*/;
   var match = grepRegEx.exec(cmd);
-
-  if (match && match[1]) {
-    this.emit('grep', match[1]);
+  if (match && match[1] && !match[2]) {
+    var expression = '^' + match[1]+':.*';
+    this.emit('grep', expression);
+  }
+  else if (match && match[1] && match[2])
+  {
+    var expression = '^' + match[1]+':.*'+match[2]+'.*';
+    this.emit('grep', expression);
   }
   else if (exitRegEx.test(cmd)) {
     this.emit('exit', cmd);
   }
   else {
     console.log('Usage: grep [OPTION]...');
+    this.prompt();
   }
-  this.prompt();
+  
 };
 
 Prompt.prototype.prompt = function () {

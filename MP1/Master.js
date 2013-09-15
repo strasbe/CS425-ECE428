@@ -21,7 +21,7 @@ Master.prototype = {
   connect: function() {
     var self = this;
     this.server = net.createServer(function(connection) {
-      console.log('Slave Connected');
+      // console.log('Slave Connected');
       self.slaves.push(connection);
 
       connection.on('data', function(data) {
@@ -40,7 +40,7 @@ Master.prototype = {
       });
 
     connection.on('end', function() {
-      console.log('Slave Disconnected');
+      // console.log('Slave Disconnected');
     });
 
 
