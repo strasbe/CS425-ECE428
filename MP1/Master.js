@@ -20,11 +20,10 @@ Master.prototype = {
 
   connect: function() {
     var self = this;
-    this.server = net.createServer(function(connection) {
-      // console.log('Slave Connected');
+    this.server = net.createServer(function (connection) {
       self.slaves.push(connection);
 
-      connection.on('data', function(data) {
+      connection.on('data', function (data) {
         data = data.toString('utf-8');
         var match = self.checkReceivedForGrep(data);
         if (match && match[1]) {
@@ -36,43 +35,59 @@ Master.prototype = {
         }
         else {
           // Writing grep output
-          // console.log(data);
           process.stdout.write(data);
         }
       });
 
-    connection.on('end', function() {
-      // console.log('Slave Disconnected');
-    });
+      connection.on('end', function () {
+        self.slaveDisconnect(this);
+      });
 
+      connection.on('error', function() {
+       self.slaveDisconnect(this);
+      });
 
     });
 
     this.server.listen(masterport, function() {
-      console.log('Listening for slaves on port:', masterport);
       self.commandLine.prompt();
     });
   },
 
-  setupEvents: function() {
+  slaveDisconnect: function (lostConnection) {
+    var index = null;
+    for (var i = 0; i < this.slaves.length; i++) {
+      if( this.slaves[i] === lostConnection)
+      {
+        index = i;
+        break;
+      }
+    }
+    
+    if(index)
+    {
+      this.slaves.splice(index,1);
+    }
+  },
+
+  setupEvents: function () {
     var self = this;
     this.commandLine.on('grep', function (cmd) {
       self.reply = null;
       self.broadcast(cmd);
       runGrep.runGrep(cmd, function (data) {
         data = data.toString('utf-8');
-        console.log(data);
+        process.stdout.write(data);
       });
     });
-
   },
 
-  checkReceivedForGrep: function(cmd) {
+  checkReceivedForGrep: function (cmd) {
     var regex = /^grep (.*)/;
     return regex.exec(cmd);
   },
 
-  receivedGrep: function(cmd) {
+  receivedGrep: function (cmd) {
     var self = this;
     this.broadcast(cmd);
     runGrep.runGrep(cmd, function (data) {
@@ -82,7 +97,7 @@ Master.prototype = {
     });
   },
 
-  broadcast: function(cmd) {
+  broadcast: function (cmd) {
     var self = this;
     this.slaves.forEach(function (connection) {
       if ( connection != self.reply) {

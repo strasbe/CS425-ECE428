@@ -35,7 +35,6 @@ Slave.prototype = {
       }
       else{
         if (process.env['NODE_ENV'] !== 'test') {
-          // console.log(data);
           process.stdout.write(data);
         }
       }
@@ -55,7 +54,6 @@ Slave.prototype = {
       data = data.toString('utf-8');
       if (process.env['NODE_ENV'] !== 'test') {
         // Grep Output
-        // console.log(data);
         process.stdout.write(data);        
       }
     });

@@ -40,7 +40,7 @@ Prompt.prototype.receivedCmd = function (cmd) {
     this.emit('exit', cmd);
   }
   else {
-    console.log('Usage: grep [OPTION]...');
+    console.log('Usage: grep [Key]... [Value]...');
     this.prompt();
   }
   
