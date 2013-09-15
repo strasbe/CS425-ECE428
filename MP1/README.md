@@ -13,6 +13,12 @@ The implementation takes care of slave and master disconnections. If a slave dis
 There are two types of tests implemented, one for slaves, and one for a master. The slave tests assume that a master and other slaves are set up. The slave will broadcast a message telling all the machines to create a log file with known key value pairs that hold 4 catagories. There are rare key value pairs that only appear once in each log file, somewhat frequent, frequent, and random key value pairs. The slave then runs a grep on the three different categories with known outputs and checks to see if the outputs are correct. The master test is the same principal but assumes there are slaves set up on the other machines waiting to connect to a master.
 
 ## Use
+Before running anything run:
+
+	$ npm install
+
+in order to install all the node dependancies.
+
 To run the distributed log system run on one machine:
 
 	$ node Master.js 
