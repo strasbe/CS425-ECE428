@@ -14,11 +14,16 @@ There are two types of tests implemented, one for slaves, and one for a master. 
 
 ## Use
 To run the distributed log system run on one machine:
+
 	$ node Master.js 
+
 and run:
+
 	$ node Slave.js
+
 on any other machines you want to be a part of the distributed system
 
 ## Testing
 Set up all machines required for tests, for Master test set up other slaves for the master to communicate with and for a Slave test set up a Master and other slaves for the slaves to communicate with:
+
 	$ npm test
