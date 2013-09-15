@@ -8,7 +8,6 @@ var runGrep = function (cmd, cb) {
 
   grep.stdout.on('data', function (data) {
     cb(data);
-    // output += data.toString('utf-8');
   });
 
   grep.stderr.pipe(process.stdout);

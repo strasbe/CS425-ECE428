@@ -19,12 +19,12 @@ Slave.prototype = {
     var self = this;
     this.connection = net.connect({port: masterPort}, function () {
       if (process.env['NODE_ENV'] !== 'test') {
-        self.commandLine.prompt();        
+        self.commandLine.prompt();
       }
     });
   },
 
-  setupEvents: function () {
+  setupEvents: function (onlyConnection) {
     var self = this;
     /* If Master sends a valid grep command, run grep */
     this.connection.on('data', function (data) {
@@ -40,9 +40,18 @@ Slave.prototype = {
       }
     });
 
-    this.commandLine.on('grep', function (cmd) {
-      self.receivedGrepFromCommandLine(cmd);
+    this.connection.on('error', function (err) {
+      if (err.code === 'ECONNREFUSED') {
+          self.connect();
+          self.setupEvents(true);
+      }
     });
+
+    if (!onlyConnection) {
+      this.commandLine.on('grep', function (cmd) {
+        self.receivedGrepFromCommandLine(cmd);
+      });  
+    }
   },
 
   receivedGrepFromCommandLine: function (cmd) {
@@ -54,7 +63,7 @@ Slave.prototype = {
       data = data.toString('utf-8');
       if (process.env['NODE_ENV'] !== 'test') {
         // Grep Output
-        process.stdout.write(data);        
+        process.stdout.write(data);
       }
     });
   },

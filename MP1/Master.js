@@ -36,7 +36,9 @@ Master.prototype = {
         else {
           // Writing grep output
           process.stdout.write(data);
+          self.commandLine.prompt();
         }
+
       });
 
       connection.on('end', function () {
@@ -78,7 +80,8 @@ Master.prototype = {
       runGrep.runGrep(cmd, function (data) {
         data = data.toString('utf-8');
         process.stdout.write(data);
-      });
+        self.commandLine.prompt();
+      });      
     });
   },
 

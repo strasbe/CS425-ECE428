@@ -14,6 +14,7 @@ Prompt.prototype.initialize = function () {
     input: process.stdin,
     output: process.stdout
   });
+  this.rl.setPrompt('');
 };
 
 Prompt.prototype.setupEvents = function () {
