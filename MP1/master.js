@@ -15,6 +15,7 @@ Master.prototype = {
     var self = this;
     this.commandLine = new Prompt();
     this.slaves = [];
+    this.reply = null;
   },
 
   connect: function() {
@@ -27,8 +28,11 @@ Master.prototype = {
         data = data.toString('utf-8');
         var match = self.checkReceivedForGrep(data);
         if (match && match[1]) {
+            self.reply = connection;
             self.receivedGrep(match[1]);
-            console.log(data);
+        }
+        else if(self.reply != null){
+          self.reply.write(data);
         }
         else {
           console.log(data);
@@ -51,6 +55,7 @@ Master.prototype = {
   setupEvents: function() {
     var self = this;
     this.commandLine.on('grep', function (cmd) {
+      self.reply = null;
       self.broadcast(cmd);
       runGrep.runGrep(cmd, function (data) {
         data = data.toString('utf-8');
@@ -66,17 +71,21 @@ Master.prototype = {
   },
 
   receivedGrep: function(cmd) {
+    var self = this;
     this.broadcast(cmd);
     runGrep.runGrep(cmd, function (data) {
       data = data.toString('utf-8');
-      console.log('utf-8');
+      if(self.reply != null)
+        self.reply.write(data);
     });
   },
 
   broadcast: function(cmd) {
-    console.log(cmd);
+    var self = this;
     this.slaves.forEach(function (connection) {
-      connection.write('grep '+ cmd);
+      if ( connection != self.reply) {
+        connection.write('grep '+ cmd);
+      }
     });
   }
 }
