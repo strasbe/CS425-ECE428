@@ -1,4 +1,4 @@
-var logFile = 'machine.4.log';
+var logFile = 'machine.1.log';
 
 var runGrep = function (cmd, cb) {
   /* Call back function if there is data to output from grep */

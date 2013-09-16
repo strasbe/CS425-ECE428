@@ -1,4 +1,5 @@
 var masterPort = 8000;
+var hostName = 'localhost';
 
 var net = require('net');
 var Prompt = require('./prompt');
@@ -21,7 +22,7 @@ Slave.prototype = {
   /* Connects Slave to Master */
   connect: function () {
     var self = this;
-    this.connection = net.connect({port: masterPort}, function () {
+    this.connection = net.connect({port: masterPort, host: hostName}, function () {
       if (process.env['NODE_ENV'] !== 'test') {
         self.commandLine.prompt();
       }

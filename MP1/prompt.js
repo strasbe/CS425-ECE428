@@ -23,6 +23,8 @@ Prompt.prototype.setupEvents = function () {
   this.rl.on('line', function (cmd) {
     self.receivedCmd(cmd);
   });
+  this.rl.setPrompt('');
+  
 };
 
 /* Determines the command the user inputed in to the machine */
