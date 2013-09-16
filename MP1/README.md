@@ -10,8 +10,6 @@ If the master is the machine that has the local grep request, the process is ide
 
 The implementation takes care of slave and master disconnections. If a slave disconnects the master just simply forgets the slave exists and the system works the exact same minus the failed machine. If the master fails, the slaves turn into just local machines and grep commands only work for the local machine. They do continually try to reconnect with the master, and once the master is back online the distributed system works the same as it did when it was initially set up.
 
-There are two types of tests implemented, one for slaves, and one for a master. The slave tests assume that a master and other slaves are set up. The slave will broadcast a message telling all the machines to create a log file with known key value pairs that hold 4 catagories. There are rare key value pairs that only appear once in each log file, somewhat frequent, frequent, and random key value pairs. The slave then runs a grep on the three different categories with known outputs and checks to see if the outputs are correct. The master test is the same principal but assumes there are slaves set up on the other machines waiting to connect to a master.
-
 ## Use
 Before running anything run:
 
@@ -27,9 +25,9 @@ and run:
 
 	$ node Slave.js
 
-on any other machines you want to be a part of the distributed system
+on any other machines you want to be a part of the distributed system. You will need to specify a filename you want the machines to grep on in the runGrep.js file.
 
 ## Testing
-Set up all machines required for tests, for Master test set up other slaves for the master to communicate with and for a Slave test set up a Master and other slaves for the slaves to communicate with:
+Set up all the machines you want to run with the test. Within the  SlaveLogTests.js file there is a parameter for the amount of machines other than the test machine.
 
-	$ npm test
+	$ node SlaveLogTests.js
