@@ -3,6 +3,7 @@ var masterport = 8000;
 var net = require('net');
 var Prompt = require('./prompt');
 var runGrep = require('./runGrep');
+var logFile = require('./genLogFile');
 
 function Master() {
   this.initialize();
@@ -29,8 +30,14 @@ Master.prototype = {
         data = data.toString('utf-8');
 
         var match = self.checkReceivedForGrep(data);
+        var check = self.checkReceivedForGenerateLog(data);
 
-        /* Valid grep command */
+        /* Valid grep command and log generation command */
+        if (check) {
+          self.broadcastLog(data);
+          logFile.genLogFile(data);
+
+        }
         if (match && match[1]) {
             self.reply = connection;
             self.receivedGrep(match[1]);
@@ -97,6 +104,13 @@ Master.prototype = {
     });
   },
 
+  checkReceivedForGenerateLog: function (cmd) {
+    var regex = /^Generate Log.*/;
+    var match = regex.exec(cmd);
+
+    return match;
+  },
+
   /* Checks command for grep command */
   checkReceivedForGrep: function (cmd) {
     var regex = /^grep (.*)/;
@@ -123,6 +137,14 @@ Master.prototype = {
       if (connection != self.reply) {
         connection.write('grep '+ cmd);
       }
+    });
+  },
+
+  /* Tells all other Slaves to run grep command */
+  broadcastLog: function (cmd) {
+    var self = this;
+    this.slaves.forEach(function (connection) {
+        connection.write(cmd);
     });
   }
 }

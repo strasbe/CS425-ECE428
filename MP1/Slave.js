@@ -3,8 +3,11 @@ var masterPort = 8000;
 var net = require('net');
 var Prompt = require('./prompt');
 var runGrep = require('./runGrep');
+var logFile = require('./genLogFile');
+var EventEmitter = require('events').EventEmitter;
 
 function Slave() {
+  this.eventEmitter = new EventEmitter();
   this.initialize();
   this.connect();
   this.setupEvents();
@@ -12,7 +15,6 @@ function Slave() {
 
 Slave.prototype = {
   initialize: function () {
-    var self = this;
     this.commandLine = new Prompt();
   },
 
@@ -30,16 +32,25 @@ Slave.prototype = {
   setupEvents: function (onlyConnection) {
     var self = this;
 
-    /* If Master sends a valid grep command, run grep */
+    /* If Master sends a valid grep command or log generation, run grep or generate log */
     this.connection.on('data', function (data) {
       data = data.toString('utf-8');
       var cmd = self.checkReceivedForGrep(data);
-      if (cmd) {
+      var check = self.checkReceivedForGenerateLog(data);
+
+      if (check){
+        logFile.genLogFile(check);
+      }
+      else if (cmd) {
         self.receivedGrep(cmd);
       }
       else{
         if (process.env['NODE_ENV'] !== 'test') {
           process.stdout.write(data);
+        }
+        else
+        {
+          self.eventEmitter.emit('Got Data', data);
         }
       }
     });
@@ -71,7 +82,7 @@ Slave.prototype = {
     runGrep.runGrep(cmd, function (data) {
       data = data.toString('utf-8');
       if (process.env['NODE_ENV'] !== 'test') {
-        // Grep Output
+        /* Grep Output */
         process.stdout.write(data);
       }
     });
@@ -88,6 +99,13 @@ Slave.prototype = {
     else {
       return null;
     }
+  },
+
+  checkReceivedForGenerateLog: function (cmd) {
+    var regex = /^Generate Log.*/;
+    var match = regex.exec(cmd);
+
+    return match;
   },
 
   /* If Master sent out grep command, run grep and send results */
