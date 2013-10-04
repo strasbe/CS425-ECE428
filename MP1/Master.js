@@ -13,13 +13,12 @@ function Master() {
 
 Master.prototype = {
   initialize: function () {
-    var self = this;
     this.commandLine = new Prompt();
     this.slaves = [];
     this.reply = null;
   },
 
-  connect: function() {
+  connect: function () {
     var self = this;
     this.server = net.createServer(function (connection) {
       /* Keeps track of all the slaves connected */
