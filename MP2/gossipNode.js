@@ -9,6 +9,7 @@ var dgram = require('dgram');
 function gossipNode() {
   this.initSocket();
   this.initialize();
+  this.list = {};
   // this.events();
 }
 
@@ -51,7 +52,7 @@ gossipNode.prototype = {
   },
 
   getTime: function () {
-
+    return new Date().getTime();
   },
 
   gossip: function (ip) {
@@ -63,7 +64,13 @@ gossipNode.prototype = {
   },
 
   updateList: function(ip, time, status) {
-
+    if(!(ip in this.list)){
+      this.list[ip] = {'startTime': time, 'status': status};
+    }
+    if(this.list[ip].startTime <= time){
+      this.list[ip].startTime = time;
+      this.list[ip].status = status;
+    }
   },
 
   disconnect: function () {
