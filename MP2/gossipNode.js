@@ -5,6 +5,7 @@ var contactNodeIP = '127.0.0.4';
 var hostName = 'localhost';
 
 var dgram = require('dgram');
+var fs = require('fs');
 
 function gossipNode() {
   this.initSocket();
@@ -48,7 +49,11 @@ gossipNode.prototype = {
   },
 
   writeToLog: function (ip, time, status) {
-
+    fs.writeFile("machine.ipAddress", ""+ip+"/"+time+": " + status, function(err) {
+        if(err) {
+            console.log(err);
+        } 
+    }); 
   },
 
   getTime: function () {
