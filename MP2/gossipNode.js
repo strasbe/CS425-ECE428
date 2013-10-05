@@ -1,23 +1,20 @@
 var port = 8000;
-var ipAddr = '0.0.0.6';
+var ipAddr = '127.0.0.4';//'0.0.0.6';
 var contactNodeIP = '127.0.0.4';
 var timeout = 500;
 var sendDelay = 100;
-
 var dgram = require('dgram');
 var fs = require('fs');
 
 function gossipNode() {
+  this.list = {};
   this.initSocket();
   this.initializeList();
-  this.list = {};
-  var self = this;
 
+  var self = this;
   setInterval(function() {
     self.gossip(ipAddr);
   }, sendDelay);
-
-  this.initialize();
 
   this.events();
 }
@@ -31,11 +28,12 @@ gossipNode.prototype = {
 
   initializeList: function () {
     if(ipAddr != contactNodeIP) {
-      // this.gossip(contactNodeIP);
+      this.gossip(contactNodeIP);
     }
 
-    this.writeToLog(ipAddr, this.getTime(), 'Joined');
-
+    var time = this.getTime();
+    this.updateList(ipAddr, time, 'Joined');
+    this.writeToLog(ipAddr, time, 'Joined');
   },
 
   /* All event handling */
@@ -43,7 +41,8 @@ gossipNode.prototype = {
     var self = this;
 
     this.sock.on('message', function (msg, rinfo) {
-      console.log('recieved: ' + msg + from + rinfo.address + ':' + rinfo.port);
+      // var recieved = new Buffer(JSON.parse(msg), 'utf-8');
+      console.log('recieved: ' + msg);
     });
 
     /* Node attempting to talk to crashed */
@@ -65,13 +64,11 @@ gossipNode.prototype = {
   },
 
   gossip: function (ip) {
-    var message = new Buffer('hello2');
-    this.sock.send(message,0,message.length,port, contactNodeIP, function(err, bytes) {
-    });
+    var message = new Buffer(JSON.stringify(this.list), 'utf-8');
+    this.sock.send(message, 0, message.length, port, ipAddr);
   },
 
   sendList: function (ip) {
-    console.log('sendList');
   },
 
   updateList: function(ip, time, status) {
@@ -92,5 +89,5 @@ gossipNode.prototype = {
 module.exports = gossipNode;
 
 if (require.main === module) {
-  var gossipNode = new gossipNode();
+  var GossipNode = new gossipNode();
 }
