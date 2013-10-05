@@ -1,29 +1,35 @@
 var port = 8000;
-var ipAddr = '0.0.0.5';
+var ipAddr = '0.0.0.6';
 var contactNodeIP = '127.0.0.4';
-
-var hostName = 'localhost';
+var timeout = 500;
+var sendDelay = 100;
 
 var dgram = require('dgram');
 
 function gossipNode() {
   this.initSocket();
-  this.initialize();
-  // this.events();
+  this.initializeList();
+  var self = this;
+  setInterval(function() {
+    self.gossip(ipAddr);
+  }, sendDelay);
+
+  this.events();
 }
 
 gossipNode.prototype = {
+
   initSocket: function () {
-    this.socket = dgram.createSocket('udp4');
-    this.socket.bind(port, ipAddr);
+    this.sock = dgram.createSocket('udp4');
+    this.sock.bind(port, ipAddr);
   },
 
   initializeList: function () {
     if(ipAddr != contactNodeIP) {
-      gossip(contactNodeIP);
+      // this.gossip(contactNodeIP);
     }
 
-    writeToLog(ipAddr, getTime(), 'Joined');
+    this.writeToLog(ipAddr, this.getTime(), 'Joined');
 
   },
 
@@ -31,18 +37,13 @@ gossipNode.prototype = {
   events: function (onlyConnection) {
     var self = this;
 
-    this.socket.on('message', function (msg, rinfo) {
+    this.sock.on('message', function (msg, rinfo) {
       console.log('recieved: ' + msg + from + rinfo.address + ':' + rinfo.port);
     });
 
     /* Node attempting to talk to crashed */
-    this.socket.on('error', function (err) {
-
-      /* Machine Attempted to talk to has crashed */
-      if (err.code === 'ECONNREFUSED' || err.code === 'EPIPE') {
-
-      }
-
+    this.sock.on('timeout', function () {
+      console.log('Timed Out');
     });
   },
 
@@ -55,11 +56,13 @@ gossipNode.prototype = {
   },
 
   gossip: function (ip) {
-
+    var message = new Buffer('hello2');
+    this.sock.send(message,0,message.length,port, contactNodeIP, function(err, bytes) {
+    });
   },
 
   sendList: function (ip) {
-
+    console.log('sendList');
   },
 
   updateList: function(ip, time, status) {
@@ -67,7 +70,7 @@ gossipNode.prototype = {
   },
 
   disconnect: function () {
-    this.socket.close();
+    this.sock.close();
   }
 };
 
