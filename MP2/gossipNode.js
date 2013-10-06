@@ -9,7 +9,7 @@ var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
 var ipAddr = process.argv[2];
-var timeout = 100;
+var timeout = 500;
 var sendDelay = 10;
 var currNodeIpAddr;
 var intervalTimer;
@@ -67,6 +67,9 @@ gossipNode.prototype = {
 
     /* Node Voluntarily leaves */
     this.eventEmitter.on('exit', function () {
+        for( var ip in self.ipList) {
+          clearTimeout(self.ipList[ip].timer);
+        }
         self.updateNode(ipAddr, self.list[ipAddr].startTime, 'Left');
         self.gossip(currNodeIpAddr, function () {
           self.exit();
@@ -75,6 +78,13 @@ gossipNode.prototype = {
 
     this.receiveSocket.on('message', function (msg, rinfo) {
         var recieved = JSON.parse(msg);
+        if(!(rinfo.address in self.ipList)) {
+          self.ipList[rinfo.address] = { 'timer':setTimeout(self.connectionTimedOut(rinfo.address), timeout) };
+        }
+        else {
+          clearTimeout(self.ipList[rinfo.address].timer);
+          self.ipList[rinfo.address].timer = setTimeout(self.connectionTimedOut(rinfo.address), timeout);
+        }
         self.updateList(recieved);
     });
 
@@ -163,7 +173,9 @@ gossipNode.prototype = {
           this.list[ip].status = 0;
         }
         else if (status === 'Crashed' || status === 1) {
-          this.list[ip].status = 1;
+          if(this.list[ip].status !== 0) {
+            this.list[ip].status = 1;
+          }
         }
         if(time !== 0) {
           this.writeToLog(ip, time, status);
@@ -176,13 +188,6 @@ gossipNode.prototype = {
     for(var ip in recievedList) {
       if(ip !== ipAddr) {
         this.updateNode(ip, recievedList[ip].startTime, recievedList[ip].status);
-        if(!(ip in this.ipList)) {
-          this.ipList[ip] = { 'timer':setTimeout(this.connectionTimedOut(ip), timeout) };
-        }
-        else {
-          clearTimeout(this.ipList[ip].timer);
-          this.ipList[ip].timer = setTimeout(this.connectionTimedOut(ip), timeout);
-        }
       }
     }
   },
@@ -190,7 +195,7 @@ gossipNode.prototype = {
   connectionTimedOut: function (ip) {
     var self = this;
     return function () {
-      self.updateNode(ip, self.list[ip].startTime, 'Crashed');
+      self.updateNode(ip, self.list[ip].startTime, 1);
     };
   },
 
