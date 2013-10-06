@@ -10,7 +10,7 @@ var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
 var ipAddr = process.argv[2];
 var timeout = 500;
-var sendDelay = 1000;
+var sendDelay = 10;
 var ackMsg = new Buffer('ACK', 'utf-8');
 var currNodeIpAddr;
 var intervalTimer;
@@ -145,14 +145,15 @@ gossipNode.prototype = {
   },
 
   updateNode: function(ip, time, status) {
+    /* New IP address */
     if(!(ip in this.list)) {
       this.list[ip] = { 'startTime': time, 'status': status };
 
       /* Don't log anything for contactNodeIP before recieving info from it */
-      if( status !== 0) {
+      if(time !== 0) {
         this.writeToLog(ip, time, status);
       }
-    }
+    } /* Reincarnation of previously used IP */
     else if(this.list[ip].startTime < time) {
       this.list[ip].startTime = time;
       this.list[ip].status = status;
@@ -161,19 +162,18 @@ gossipNode.prototype = {
       if(status !== 0 || status !== 1) {
         this.writeToLog(ip, time, status);
       }
-    }
-    else if(this.list[ip].startTime === time) {
+    } /* Update Current IP Machine */
+    else if(this.list[ip].startTime === time && status !== 'Joined') {
       if(this.list[ip].status !== status) {
-        if(status === 'Left') {
+        if(status === 'Left' || status === 0) {
           this.list[ip].status = 0;
         }
-        else if (status === 'Crashed') {
+        else if (status === 'Crashed' || status === 1) {
           this.list[ip].status = 1;
         }
-        else {
-          this.list[ip].status = status;
+        if(time !== 0) {
+          this.writeToLog(ip, time, status);
         }
-        this.writeToLog(ip, time, status);
       }
     }
   },
