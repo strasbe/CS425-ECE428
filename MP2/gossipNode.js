@@ -119,7 +119,12 @@ gossipNode.prototype = {
   getRandomIpAddr: function () {
     var keys = Object.keys(this.list);
     keys = _.without(keys, ipAddr);
-    var randIp = keys[Math.floor(keys.length * Math.random())];
+    var randIp;
+
+    /* If node is gone, don't try to gossip with it */
+    do {
+      randIp = keys[Math.floor(keys.length * Math.random())];
+    } while(list[randIp].status !== 'Joined');
 
     /* Don't gossip with self */
     if(!randIp) {
