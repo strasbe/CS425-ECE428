@@ -8,6 +8,7 @@ var contactNodeIP = '127.0.0.4';
 var ipAddr = '127.0.0.5';
 var timeout = 500;
 var sendDelay = 100;
+var ackMsg = new Buffer('ACK', 'utf-8');
 
 function gossipNode() {
   this.list = {};
@@ -50,9 +51,14 @@ gossipNode.prototype = {
     var self = this;
 
     this.receiveSocket.on('message', function (msg, rinfo) {
-      console.log(rinfo);
-      var recieved = JSON.parse(msg);
-      self.updateList(recieved);
+      if(msg.toString() !== ackMsg.toString()) {
+        var recieved = JSON.parse(msg);
+        self.updateList(recieved);
+
+        /* Respond to all messages saying that list was recieved */
+        self.sendSocket.send(ackMsg, 0, ackMsg.length, receivePort, rinfo.address);
+      }
+
     });
 
   },
