@@ -50,6 +50,7 @@ gossipNode.prototype = {
     var self = this;
 
     this.receiveSocket.on('message', function (msg, rinfo) {
+      console.log(rinfo);
       var recieved = JSON.parse(msg);
       self.updateList(recieved);
     });
