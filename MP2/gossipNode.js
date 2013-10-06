@@ -1,7 +1,10 @@
 var dgram = require('dgram');
 var fs = require('fs');
 var _ = require('underscore');
+var readline = require('readline');
+var EventEmitter = require('events').EventEmitter;
 
+var exitCmd = '/^exit.*/';
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
@@ -9,24 +12,34 @@ var ipAddr = '127.0.0.5';
 var timeout = 500;
 var sendDelay = 100;
 var ackMsg = new Buffer('ACK', 'utf-8');
+var currNodeIpAddr;
 
 function gossipNode() {
+  this.eventEmitter = new EventEmitter();
   this.list = {};
+  this.initialize();
   this.initSockets();
   this.initializeList();
 
   var self = this;
   setInterval(function() {
-    var currNodeIpAddr = self.getRandomIpAddr();
-    if(currNodeIpAddr !== 0) {
-      self.gossip(currNodeIpAddr);
-    }
+    currNodeIpAddr = self.getRandomIpAddr();
+    self.gossip(currNodeIpAddr);
   }, sendDelay);
 
   this.events();
 }
 
 gossipNode.prototype = {
+
+  initialize: function () {
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    this.rl.prompt('>');
+  },
 
   initSockets: function () {
     this.sendSocket = dgram.createSocket('udp4');
@@ -50,6 +63,14 @@ gossipNode.prototype = {
   events: function () {
     var self = this;
 
+    /* Node Voluntarily leaves */
+    this.eventEmitter.on('exit', function () {
+        self.updateNode(ipAddr, self.list[ipAddr].startTime, 'Left');
+        self.gossip(currNodeIpAddr);
+        self.exit();
+
+    });
+
     this.receiveSocket.on('message', function (msg, rinfo) {
       if(msg.toString() !== ackMsg.toString()) {
         var recieved = JSON.parse(msg);
@@ -61,6 +82,17 @@ gossipNode.prototype = {
 
     });
 
+    this.rl.on('line', function (cmd) {
+      self.receivedCmd(cmd);
+    });
+
+  },
+
+  receivedCmd: function (cmd) {
+    if(exitCmd.match(cmd)) {
+      this.eventEmitter.emit('exit');
+    }
+    this.rl.prompt('>');
   },
 
   writeToLog: function (ip, time, status) {
@@ -74,9 +106,11 @@ gossipNode.prototype = {
   },
 
   gossip: function (ip) {
-    var self = this;
-    var msg = new Buffer(JSON.stringify(this.list), 'utf-8');
-    this.sendSocket.send(msg, 0, msg.length, receivePort, ip);
+    if(ip !== 0) {
+      var self = this;
+      var msg = new Buffer(JSON.stringify(this.list), 'utf-8');
+      this.sendSocket.send(msg, 0, msg.length, receivePort, ip);
+    }
   },
 
   getRandomIpAddr: function () {
@@ -89,7 +123,7 @@ gossipNode.prototype = {
       randIp = 0;
     }
     return randIp;
-    },
+  },
 
   updateNode: function(ip, time, status) {
     if(!(ip in this.list)) {
@@ -100,7 +134,7 @@ gossipNode.prototype = {
         this.writeToLog(ip, time, status);
       }
     }
-    else if(this.list[ip].startTime < time) {
+    else if(this.list[ip].startTime <= time) {
       this.list[ip].startTime = time;
       this.list[ip].status = status;
 
@@ -117,8 +151,10 @@ gossipNode.prototype = {
     }
   },
 
-  disconnect: function () {
-    this.sendSocket.close();
+  exit: function () {
+    // this.sendSocket.close();
+    // this.receiveSocket.close();
+    this.rl.close();
   }
 };
 
