@@ -9,9 +9,8 @@ var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
 var ipAddr = process.argv[2];
-var timeout = 500;
+var timeout = 100;
 var sendDelay = 10;
-var ackMsg = new Buffer('ACK', 'utf-8');
 var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
@@ -19,6 +18,7 @@ var filename = 'machine.' + ipAddr + '.log';
 function gossipNode() {
   this.eventEmitter = new EventEmitter();
   this.list = {};
+  this.ipList = {};
   this.initialize();
   this.initSockets();
   this.initializeList();
@@ -35,7 +35,7 @@ function gossipNode() {
 gossipNode.prototype = {
 
   initialize: function () {
-    fs.writeFileSync(filename, '');
+    fs.writeFileSync(filename, '');//delete this line
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
@@ -74,14 +74,8 @@ gossipNode.prototype = {
     });
 
     this.receiveSocket.on('message', function (msg, rinfo) {
-      if(msg.toString() !== ackMsg.toString()) {
         var recieved = JSON.parse(msg);
         self.updateList(recieved);
-
-        /* Respond to all messages saying that list was recieved */
-        self.sendSocket.send(ackMsg, 0, ackMsg.length, receivePort, rinfo.address, function () {});
-      }
-
     });
 
     this.rl.on('line', function (cmd) {
@@ -180,8 +174,24 @@ gossipNode.prototype = {
 
   updateList: function (recievedList) {
     for(var ip in recievedList) {
-      this.updateNode(ip, recievedList[ip].startTime, recievedList[ip].status);
+      if(ip !== ipAddr) {
+        this.updateNode(ip, recievedList[ip].startTime, recievedList[ip].status);
+        if(!(ip in this.ipList)) {
+          this.ipList[ip] = { 'timer':setTimeout(this.connectionTimedOut(ip), timeout) };
+        }
+        else {
+          clearTimeout(this.ipList[ip].timer);
+          this.ipList[ip].timer = setTimeout(this.connectionTimedOut(ip), timeout);
+        }
+      }
     }
+  },
+
+  connectionTimedOut: function (ip) {
+    var self = this;
+    return function () {
+      self.updateNode(ip, self.list[ip].startTime, 'Crashed');
+    };
   },
 
   exit: function () {
