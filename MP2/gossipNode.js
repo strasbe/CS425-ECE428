@@ -1,19 +1,25 @@
-var port = 8000;
-var ipAddr = '127.0.0.4';//'0.0.0.6';
-var contactNodeIP = '127.0.0.4';
-var timeout = 500;
-var sendDelay = 100;
 var dgram = require('dgram');
 var fs = require('fs');
+var _ = require('underscore');
+
+var sendPort = 8000;
+var receivePort = sendPort + 1;
+var contactNodeIP = '127.0.0.4';
+var ipAddr = '127.0.0.5';
+var timeout = 500;
+var sendDelay = 100;
 
 function gossipNode() {
   this.list = {};
-  this.initSocket();
+  this.initSockets();
   this.initializeList();
 
   var self = this;
   setInterval(function() {
-    self.gossip(ipAddr);
+    var currNodeIpAddr = self.getRandomIpAddr();
+    if(currNodeIpAddr !== 0) {
+      self.gossip(currNodeIpAddr);
+    }
   }, sendDelay);
 
   this.events();
@@ -21,42 +27,39 @@ function gossipNode() {
 
 gossipNode.prototype = {
 
-  initSocket: function () {
-    this.sock = dgram.createSocket('udp4');
-    this.sock.bind(port, ipAddr);
+  initSockets: function () {
+    this.sendSocket = dgram.createSocket('udp4');
+    this.receiveSocket = dgram.createSocket('udp4');
+    this.sendSocket.bind(sendPort, ipAddr);
+    this.receiveSocket.bind(receivePort, ipAddr);
   },
 
   initializeList: function () {
+    var time = this.getTime();
+
+    this.updateNode(ipAddr, time, 'Joined');
     if(ipAddr != contactNodeIP) {
-      this.gossip(contactNodeIP);
+      /* Will keep trying to talk to contactNodeIP in beginning */
+      this.updateNode(contactNodeIP, 0, 0);
     }
 
-    var time = this.getTime();
-    this.updateList(ipAddr, time, 'Joined');
-    this.writeToLog(ipAddr, time, 'Joined');
   },
 
   /* All event handling */
-  events: function (onlyConnection) {
+  events: function () {
     var self = this;
 
-    this.sock.on('message', function (msg, rinfo) {
-      // var recieved = new Buffer(JSON.parse(msg), 'utf-8');
-      console.log('recieved: ' + msg);
+    this.receiveSocket.on('message', function (msg, rinfo) {
+      var recieved = JSON.parse(msg);
+      self.updateList(recieved);
     });
 
-    /* Node attempting to talk to crashed */
-    this.sock.on('timeout', function () {
-      console.log('Timed Out');
-    });
   },
 
   writeToLog: function (ip, time, status) {
-    fs.writeFile("machine.ipAddress", ""+ip+"/"+time+": " + status, function(err) {
-        if(err) {
-            console.log(err);
-        }
-    });
+    var filename = 'machine.' + ipAddr + '.log';
+    var logMessage = ip + '/' + time + ': ' + status + '\n';
+    fs.appendFileSync(filename, logMessage);
   },
 
   getTime: function () {
@@ -64,25 +67,51 @@ gossipNode.prototype = {
   },
 
   gossip: function (ip) {
-    var message = new Buffer(JSON.stringify(this.list), 'utf-8');
-    this.sock.send(message, 0, message.length, port, ipAddr);
+    var self = this;
+    var msg = new Buffer(JSON.stringify(this.list), 'utf-8');
+    this.sendSocket.send(msg, 0, msg.length, receivePort, ip);
   },
 
-  sendList: function (ip) {
-  },
+  getRandomIpAddr: function () {
+    var keys = Object.keys(this.list);
+    keys = _.without(keys, ipAddr);
+    var randIp = keys[Math.floor(keys.length * Math.random())];
 
-  updateList: function(ip, time, status) {
-    if(!(ip in this.list)){
-      this.list[ip] = {'startTime': time, 'status': status};
+    /* Don't gossip with self */
+    if(!randIp) {
+      randIp = 0;
     }
-    if(this.list[ip].startTime <= time){
+    return randIp;
+    },
+
+  updateNode: function(ip, time, status) {
+    if(!(ip in this.list)) {
+      this.list[ip] = { 'startTime': time, 'status': status };
+
+      /* Don't log anything for contactNodeIP before recieving info from it */
+      if( status !== 0) {
+        this.writeToLog(ip, time, status);
+      }
+    }
+    else if(this.list[ip].startTime < time) {
       this.list[ip].startTime = time;
       this.list[ip].status = status;
+
+      /* Don't log anything for contactNodeIP before recieving info from it */
+      if(status !== 0) {
+        this.writeToLog(ip, time, status);
+      }
+    }
+  },
+
+  updateList: function (recievedList) {
+    for(var ip in recievedList) {
+      this.updateNode(ip, recievedList[ip].startTime, recievedList[ip].status);
     }
   },
 
   disconnect: function () {
-    this.sock.close();
+    this.sendSocket.close();
   }
 };
 
