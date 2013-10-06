@@ -8,12 +8,13 @@ var exitCmd = '/^exit.*/';
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
-var ipAddr = '127.0.0.5';
+var ipAddr = process.argv[2];
 var timeout = 500;
-var sendDelay = 100;
+var sendDelay = 1000;
 var ackMsg = new Buffer('ACK', 'utf-8');
 var currNodeIpAddr;
 var intervalTimer;
+var filename = 'machine.' + ipAddr + '.log';
 
 function gossipNode() {
   this.eventEmitter = new EventEmitter();
@@ -34,6 +35,7 @@ function gossipNode() {
 gossipNode.prototype = {
 
   initialize: function () {
+    fs.writeFileSync(filename, '');
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
@@ -66,9 +68,9 @@ gossipNode.prototype = {
     /* Node Voluntarily leaves */
     this.eventEmitter.on('exit', function () {
         self.updateNode(ipAddr, self.list[ipAddr].startTime, 'Left');
-        self.gossip(currNodeIpAddr);
-        self.exit();
-
+        self.gossip(currNodeIpAddr, function () {
+          self.exit();
+        });
     });
 
     this.receiveSocket.on('message', function (msg, rinfo) {
@@ -77,7 +79,7 @@ gossipNode.prototype = {
         self.updateList(recieved);
 
         /* Respond to all messages saying that list was recieved */
-        self.sendSocket.send(ackMsg, 0, ackMsg.length, receivePort, rinfo.address);
+        self.sendSocket.send(ackMsg, 0, ackMsg.length, receivePort, rinfo.address, function () {});
       }
 
     });
@@ -98,8 +100,14 @@ gossipNode.prototype = {
   },
 
   writeToLog: function (ip, time, status) {
+    if(status === 0) {
+      status = 'Left';
+    }
+    else if (status === 1) {
+      status = 'Crashed';
+    }
+
     var localTime = this.getTime();
-    var filename = 'machine.' + ipAddr + '.log';
     var logMessage = ip + '/' + time + ': ' + status + ' at ' + localTime + '\n';
     fs.appendFileSync(filename, logMessage);
   },
@@ -108,11 +116,12 @@ gossipNode.prototype = {
     return new Date().getTime();
   },
 
-  gossip: function (ip) {
+  gossip: function (ip, cb) {
+    cb = cb || (function () {});
     if(ip !== 0) {
       var self = this;
       var msg = new Buffer(JSON.stringify(this.list), 'utf-8');
-      this.sendSocket.send(msg, 0, msg.length, receivePort, ip);
+      this.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
     }
   },
 
@@ -124,7 +133,9 @@ gossipNode.prototype = {
     /* If node is gone, don't try to gossip with it */
     do {
       randIp = keys[Math.floor(keys.length * Math.random())];
-    } while(list[randIp].status !== 'Joined');
+    } while(randIp && this.list[randIp].status !== 'Joined' &&
+            this.list[randIp].status !== 0 &&
+            this.list[randIp].status !== 1);
 
     /* Don't gossip with self */
     if(!randIp) {
@@ -142,12 +153,26 @@ gossipNode.prototype = {
         this.writeToLog(ip, time, status);
       }
     }
-    else if(this.list[ip].startTime <= time) {
+    else if(this.list[ip].startTime < time) {
       this.list[ip].startTime = time;
       this.list[ip].status = status;
 
       /* Don't log anything for contactNodeIP before recieving info from it */
-      if(status !== 0) {
+      if(status !== 0 || status !== 1) {
+        this.writeToLog(ip, time, status);
+      }
+    }
+    else if(this.list[ip].startTime === time) {
+      if(this.list[ip].status !== status) {
+        if(status === 'Left') {
+          this.list[ip].status = 0;
+        }
+        else if (status === 'Crashed') {
+          this.list[ip].status = 1;
+        }
+        else {
+          this.list[ip].status = status;
+        }
         this.writeToLog(ip, time, status);
       }
     }
