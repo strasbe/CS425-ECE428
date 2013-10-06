@@ -13,6 +13,7 @@ var timeout = 500;
 var sendDelay = 100;
 var ackMsg = new Buffer('ACK', 'utf-8');
 var currNodeIpAddr;
+var intervalTimer;
 
 function gossipNode() {
   this.eventEmitter = new EventEmitter();
@@ -22,7 +23,7 @@ function gossipNode() {
   this.initializeList();
 
   var self = this;
-  setInterval(function() {
+  intervalTimer = setInterval(function() {
     currNodeIpAddr = self.getRandomIpAddr();
     self.gossip(currNodeIpAddr);
   }, sendDelay);
@@ -37,7 +38,6 @@ gossipNode.prototype = {
       input: process.stdin,
       output: process.stdout
     });
-
     this.rl.prompt('>');
   },
 
@@ -92,12 +92,15 @@ gossipNode.prototype = {
     if(exitCmd.match(cmd)) {
       this.eventEmitter.emit('exit');
     }
-    this.rl.prompt('>');
+    else {
+      this.rl.prompt('>');
+    }
   },
 
   writeToLog: function (ip, time, status) {
+    var localTime = this.getTime();
     var filename = 'machine.' + ipAddr + '.log';
-    var logMessage = ip + '/' + time + ': ' + status + '\n';
+    var logMessage = ip + '/' + time + ': ' + status + ' at ' + localTime + '\n';
     fs.appendFileSync(filename, logMessage);
   },
 
@@ -152,8 +155,10 @@ gossipNode.prototype = {
   },
 
   exit: function () {
-    // this.sendSocket.close();
-    // this.receiveSocket.close();
+    intervalTimer.unref();
+    clearInterval(intervalTimer);
+    this.sendSocket.close();
+    this.receiveSocket.close();
     this.rl.close();
   }
 };
