@@ -35,7 +35,6 @@ function gossipNode() {
 gossipNode.prototype = {
 
   initialize: function () {
-    fs.writeFileSync(filename, '');//delete this line
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout
