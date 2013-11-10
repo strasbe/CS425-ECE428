@@ -4,7 +4,13 @@ var _ = require('underscore');
 var readline = require('readline');
 var EventEmitter = require('events').EventEmitter;
 
- var exitRegEx = /^exit(?:\s*).*/;
+var exitRegEx = /^exit(?:\s*).*/;
+var insertRegEx = /^insert [0-9]+ .*/;
+var lookupRegEx = /^lookup [0-9]+/;
+var updateRegEx = /^update [0-9]+ .*/;
+var deleteRegEx = /^delete [0-9]+/;
+var showRegEx = /^show(?:\s).*/;
+
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
@@ -19,6 +25,7 @@ function gossipNode() {
   this.eventEmitter = new EventEmitter();
   this.list = {};
   this.ipList = {};
+  this.kvPairs = {};
   this.initialize();
   this.initSockets();
   this.initializeList();
@@ -94,8 +101,27 @@ gossipNode.prototype = {
   },
 
   receivedCmd: function (cmd) {
-    if(exitRegEx.test(cmd)) {
+    if (exitRegEx.test(cmd)) {
       this.eventEmitter.emit('exit');
+    }
+    else if (insertRegEx.test(cmd)) {
+      this.rl.prompt('>');
+      this.eventEmitter.emit('insert', cmd);
+    }
+    else if (lookupRegEx.test(cmd)) {
+      this.rl.prompt('>');
+      this.eventEmitter.emit('lookup', cmd);
+    }
+    else if (updateRegEx.test(cmd)) {
+      this.rl.prompt('>');
+      this.eventEmitter.emit('update', cmd);
+    }
+    else if (deleteRegEx.test(cmd)) {
+      this.rl.prompt('>');
+      this.eventEmitter.emit('delete', cmd);
+    }
+    else if(showRegEx.test(cmd)) {
+      this.eventEmitter.emit('show');
     }
     else {
       this.rl.prompt('>');
@@ -181,6 +207,37 @@ gossipNode.prototype = {
         }
       }
     }
+  },
+
+  insert: function (key, value) {
+    this.kvPairs[key] = {'key': key, 'val': value};
+  },
+
+  /* returns value from key */
+  lookup: function (key) {
+    return this.kvPairs[key];
+  },
+
+  update: function (key, newValue) {
+    if(this.kvPairs[key]) {
+      this.kvPairs[key] = {'key': key, 'val': newValue};
+    }
+  },
+
+  delete: function(key) {
+    if(this.kvPairs[key]) {
+      this.kvPairs[key] = null;
+    }
+  },
+
+  show: function () {
+    this.kvPairs.forEach(function (pair) {
+        console.log(pair.val);
+    });
+
+    this.list.forEach(function (connection) {
+      console.log(connection);
+    });
   },
 
   updateList: function (recievedList) {
