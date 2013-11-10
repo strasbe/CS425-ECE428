@@ -22,7 +22,7 @@ var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
 
-var numMachines
+var numMachines;
 
 function gossipNode() {
   this.eventEmitter = new EventEmitter();
@@ -88,7 +88,7 @@ gossipNode.prototype = {
     this.eventEmitter.on('insert', function (key, value, cb) {
       cb = cb || (function () {});
       var destMachine = self.hashingFunc(key);
-      var destIp = contactNodeIP;
+      var destIp = 0;
       if(destMachine === self.list[ipAddr].machineNum) {
         self.insert(key,value);
       }
@@ -248,10 +248,10 @@ gossipNode.prototype = {
   },
 
   updateNode: function(ip, time, status, machineNum) {
+    var self = this;
     /* New IP address */
     if(!(ip in this.list)) {
       keys = Object.keys(this.list);
-      var self = this;
       keys.forEach(function(ip) {
         if(self.list[ip].status === 'Joined') {
           if(self.list[ip].machineNum >= machineNum) {
@@ -287,9 +287,17 @@ gossipNode.prototype = {
       }
     } /* Update Current IP Machine */
     else if(this.list[ip].startTime === time && status !== 'Joined') {
+      this.list[ip].machineNum = -1;
       if(this.list[ip].status !== status) {
         if(status === 'Left' || status === 0) {
           this.list[ip].status = 0;
+          if(ip === ipAddr) {
+            keys = Object.keys(this.kvPairs);
+            keys.forEach(function(key) {
+                self.eventEmitter.emit('insert', key, self.kvPairs[key], function () {});
+                self.delete(key);
+            });
+          }
         }
         else if (status === 'Crashed' || status === 1) {
           if(this.list[ip].status !== 0) {
@@ -337,7 +345,24 @@ gossipNode.prototype = {
         numMachines++;
       }
     });
-    return key % numMachines;
+    var destMachine = key % numMachines;
+    keys = Object.keys(self.list);
+    var found = false;
+    keys.forEach(function(ip) {
+          if(self.list[ip].machineNum === destMachine) {
+            found = true;
+          }
+    });
+    if(!found) {
+      var destMachine = -1;
+      keys.forEach(function(ip) {
+        if(self.list[ip].machineNum > destMachine && self.list[ip].status === 'Joined') {
+          destMachine = self.list[ip].machineNum;
+        }
+      });
+    }
+    return destMachine;
+
   },
 
   show: function () {
@@ -377,9 +402,9 @@ gossipNode.prototype = {
   exit: function () {
     intervalTimer.unref();
     clearInterval(intervalTimer);
-    this.sendSocket.close();
-    this.receiveSocket.close();
-    this.rl.close();
+    // this.sendSocket.close();
+    // this.receiveSocket.close();
+    // this.rl.close();
   }
 };
 
