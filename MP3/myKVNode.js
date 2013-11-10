@@ -14,13 +14,15 @@ var showRegEx = /^show.*/;
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
-var contactNodeIP = '192.17.11.24';
-var ipAddr = os.networkInterfaces().eth0[0].address;
-var timeout = 500;
-var sendDelay = 10;
+var contactNodeIP = '127.0.0.1';
+var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
+var timeout = 5000;
+var sendDelay = 1000;
 var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
+
+var numMachines
 
 function gossipNode() {
   this.eventEmitter = new EventEmitter();
@@ -60,10 +62,10 @@ gossipNode.prototype = {
   initializeList: function () {
     var time = this.getTime();
 
-    this.updateNode(ipAddr, time, 'Joined');
+    this.updateNode(ipAddr, time, 'Joined', 0);
     if(ipAddr != contactNodeIP) {
       /* Will keep trying to talk to contactNodeIP in beginning */
-      this.updateNode(contactNodeIP, 0, 0);
+      this.updateNode(contactNodeIP, 0, 0, 0);
     }
 
   },
@@ -77,14 +79,29 @@ gossipNode.prototype = {
         for( var ip in self.ipList) {
           clearTimeout(self.ipList[ip].timer);
         }
-        self.updateNode(ipAddr, self.list[ipAddr].startTime, 'Left');
+        self.updateNode(ipAddr, self.list[ipAddr].startTime, 'Left', -1);
         self.gossip(currNodeIpAddr, function () {
           self.exit();
         });
     });
 
-    this.eventEmitter.on('insert', function (key, value) {
-      self.insert(key,value);
+    this.eventEmitter.on('insert', function (key, value, cb) {
+      cb = cb || (function () {});
+      var destMachine = self.hashingFunc(key);
+      var destIp = contactNodeIP;
+      if(destMachine === self.list[ipAddr].machineNum) {
+        self.insert(key,value);
+      }
+      else {
+        keys = Object.keys(self.list);
+        keys.forEach(function(ip) {
+              if(self.list[ip].machineNum === destMachine) {
+                destIp = ip;
+              }
+        });
+        var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + value), 'utf-8');
+        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      }
     });
 
     this.eventEmitter.on('lookup', function (key) {
@@ -104,7 +121,8 @@ gossipNode.prototype = {
     });
 
     this.receiveSocket.on('message', function (msg, rinfo) {
-        var recieved = JSON.parse(msg);
+        var received = JSON.parse(msg);
+        self.checkCmd(received);
         if(!(rinfo.address in self.ipList)) {
           self.ipList[rinfo.address] = { 'timer':setTimeout(self.connectionTimedOut(rinfo.address), timeout) };
         }
@@ -112,8 +130,8 @@ gossipNode.prototype = {
           clearTimeout(self.ipList[rinfo.address].timer);
           self.ipList[rinfo.address].timer = setTimeout(self.connectionTimedOut(rinfo.address), timeout);
         }
-        self.updateList(recieved);
-        self.checkCmd(recieved);
+
+        self.updateList(received);
     });
 
     this.rl.on('line', function (cmd) {
@@ -199,10 +217,20 @@ gossipNode.prototype = {
     return randIp;
   },
 
-  updateNode: function(ip, time, status) {
+  updateNode: function(ip, time, status, machineNum) {
     /* New IP address */
     if(!(ip in this.list)) {
-      this.list[ip] = { 'startTime': time, 'status': status };
+      keys = Object.keys(this.list);
+      var self = this;
+      keys.forEach(function(ip) {
+        if(self.list[ip].status === 'Joined') {
+          if(self.list[ip].machineNum >= machineNum) {
+            machineNum = self.list[ip].machineNum++;
+          }
+        }
+      });
+
+      this.list[ip] = { 'startTime': time, 'status': status, 'machineNum': machineNum };
 
       /* Don't log anything for contactNodeIP before recieving info from it */
       if(time !== 0) {
@@ -232,6 +260,10 @@ gossipNode.prototype = {
           this.writeToLog(ip, time, status);
         }
       }
+    } else if(this.list[ip].startTime === time && status === 'Joined') {
+      if(this.list[ip].machineNum !== machineNum) {
+        this.list[ip].machineNum = machineNum;
+      }
     }
   },
 
@@ -260,7 +292,6 @@ gossipNode.prototype = {
 
     var self = this;
     var numMachines = 0;
-    console.log('Active Members:');
     keys.forEach(function(ip) {
       if(self.list[ip].status === 'Joined') {
         numMachines++;
@@ -283,15 +314,16 @@ gossipNode.prototype = {
     keys.forEach(function(ip) {
       if(self.list[ip].status === 'Joined') {
         console.log(' ' + ip);
+        console.log(self.list[ip].machineNum);
       }
     });
 
   },
 
-  updateList: function (recievedList) {
-    for(var ip in recievedList) {
-      if(ip !== ipAddr) {
-        this.updateNode(ip, recievedList[ip].startTime, recievedList[ip].status);
+  updateList: function (receivedList) {
+    for(var ip in receivedList) {
+      if(ip !== ipAddr && receivedList[ip].startTime !== undefined) {
+        this.updateNode(ip, receivedList[ip].startTime, receivedList[ip].status, receivedList[ip].machineNum);
       }
     }
   },
@@ -299,7 +331,7 @@ gossipNode.prototype = {
   connectionTimedOut: function (ip) {
     var self = this;
     return function () {
-      self.updateNode(ip, self.list[ip].startTime, 1);
+      self.updateNode(ip, self.list[ip].startTime, 1, -1);
     };
   },
 
