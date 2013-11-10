@@ -16,8 +16,8 @@ var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.1';
 var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
-var timeout = 5000;
-var sendDelay = 1000;
+var timeout = 500;
+var sendDelay = 10;
 var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
@@ -108,12 +108,42 @@ gossipNode.prototype = {
       console.log(self.lookup(key));
     });
 
-    this.eventEmitter.on('update', function (key, value) {
-      self.update(key,value);
+    this.eventEmitter.on('update', function (key, value, cb) {
+      cb = cb || (function () {});
+      var destMachine = self.hashingFunc(key);
+      var destIp = contactNodeIP;
+      if(destMachine === self.list[ipAddr].machineNum) {
+        self.update(key,value);
+      }
+      else {
+        keys = Object.keys(self.list);
+        keys.forEach(function(ip) {
+              if(self.list[ip].machineNum === destMachine) {
+                destIp = ip;
+              }
+        });
+        var msg = new Buffer(JSON.stringify('update ' + key + ' ' + value), 'utf-8');
+        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      }
     });
 
-    this.eventEmitter.on('delete', function (key) {
-      self.delete(key);
+    this.eventEmitter.on('delete', function (key, cb) {
+      cb = cb || (function () {});
+      var destMachine = self.hashingFunc(key);
+      var destIp = contactNodeIP;
+      if(destMachine === self.list[ipAddr].machineNum) {
+        self.delete(key);
+      }
+      else {
+        keys = Object.keys(self.list);
+        keys.forEach(function(ip) {
+              if(self.list[ip].machineNum === destMachine) {
+                destIp = ip;
+              }
+        });
+        var msg = new Buffer(JSON.stringify('delete ' + key), 'utf-8');
+        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      }
     });
 
     this.eventEmitter.on('show', function () {
@@ -314,7 +344,6 @@ gossipNode.prototype = {
     keys.forEach(function(ip) {
       if(self.list[ip].status === 'Joined') {
         console.log(' ' + ip);
-        console.log(self.list[ip].machineNum);
       }
     });
 
