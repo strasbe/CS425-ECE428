@@ -2,6 +2,7 @@ var dgram = require('dgram');
 var fs = require('fs');
 var _ = require('underscore');
 var readline = require('readline');
+var os = require('os');
 var EventEmitter = require('events').EventEmitter;
 
 var exitRegEx = /^exit(?:\s*).*/;
@@ -14,7 +15,7 @@ var showRegEx = /^show(?:\s).*/;
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.4';
-var ipAddr = process.argv[2];
+var ipAddr = os.networkInterfaces().eth0[0].address;
 var timeout = 500;
 var sendDelay = 10;
 var currNodeIpAddr;
