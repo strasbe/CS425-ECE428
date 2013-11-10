@@ -5,16 +5,16 @@ var readline = require('readline');
 var os = require('os');
 var EventEmitter = require('events').EventEmitter;
 
-var exitRegEx = /^exit(?:\s*).*/;
-var insertRegEx = /^insert [0-9]+ .*/;
-var lookupRegEx = /^lookup [0-9]+/;
-var updateRegEx = /^update [0-9]+ .*/;
-var deleteRegEx = /^delete [0-9]+/;
-var showRegEx = /^show(?:\s).*/;
+var exitRegEx = /^exit.*/;
+var insertRegEx = /^insert ([0-9]+) (.*)/;
+var lookupRegEx = /^lookup ([0-9]+)/;
+var updateRegEx = /^update ([0-9]+) (.*)/;
+var deleteRegEx = /^delete ([0-9]+)/;
+var showRegEx = /^show.*/;
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
-var contactNodeIP = '127.0.0.4';
+var contactNodeIP = '192.17.11.24';
 var ipAddr = os.networkInterfaces().eth0[0].address;
 var timeout = 500;
 var sendDelay = 10;
@@ -83,6 +83,26 @@ gossipNode.prototype = {
         });
     });
 
+    this.eventEmitter.on('insert', function (key, value) {
+      self.insert(key,value);
+    });
+
+    this.eventEmitter.on('lookup', function (key) {
+      console.log(self.lookup(key));
+    });
+
+    this.eventEmitter.on('update', function (key, value) {
+      self.update(key,value);
+    });
+
+    this.eventEmitter.on('delete', function (key) {
+      self.delete(key);
+    });
+
+    this.eventEmitter.on('show', function () {
+      self.show();
+    });
+
     this.receiveSocket.on('message', function (msg, rinfo) {
         var recieved = JSON.parse(msg);
         if(!(rinfo.address in self.ipList)) {
@@ -93,39 +113,44 @@ gossipNode.prototype = {
           self.ipList[rinfo.address].timer = setTimeout(self.connectionTimedOut(rinfo.address), timeout);
         }
         self.updateList(recieved);
+        self.checkCmd(recieved);
     });
 
     this.rl.on('line', function (cmd) {
       self.receivedCmd(cmd);
     });
 
+
+
   },
 
   receivedCmd: function (cmd) {
     if (exitRegEx.test(cmd)) {
       this.eventEmitter.emit('exit');
-    }
-    else if (insertRegEx.test(cmd)) {
-      this.rl.prompt('>');
-      this.eventEmitter.emit('insert', cmd);
-    }
-    else if (lookupRegEx.test(cmd)) {
-      this.rl.prompt('>');
-      this.eventEmitter.emit('lookup', cmd);
-    }
-    else if (updateRegEx.test(cmd)) {
-      this.rl.prompt('>');
-      this.eventEmitter.emit('update', cmd);
-    }
-    else if (deleteRegEx.test(cmd)) {
-      this.rl.prompt('>');
-      this.eventEmitter.emit('delete', cmd);
-    }
-    else if(showRegEx.test(cmd)) {
-      this.eventEmitter.emit('show');
+      return;
     }
     else {
+      this.checkCmd(cmd);
       this.rl.prompt('>');
+    }
+  },
+
+  checkCmd: function (cmd) {
+    var match = null;
+    if (match = insertRegEx.exec(cmd)) {
+      this.eventEmitter.emit('insert', match[1], match[2]);
+    }
+    else if (match = lookupRegEx.exec(cmd)) {
+      this.eventEmitter.emit('lookup', match[1]);
+    }
+    else if (match = updateRegEx.exec(cmd)) {
+      this.eventEmitter.emit('update', match[1], match[2]);
+    }
+    else if (match = deleteRegEx.exec(cmd)) {
+      this.eventEmitter.emit('delete', match[1]);
+    }
+    else if(match = showRegEx.exec(cmd)) {
+      this.eventEmitter.emit('show');
     }
   },
 
@@ -211,7 +236,7 @@ gossipNode.prototype = {
   },
 
   insert: function (key, value) {
-    this.kvPairs[key] = {'key': key, 'val': value};
+    this.kvPairs[key] = value;
   },
 
   /* returns value from key */
@@ -221,7 +246,7 @@ gossipNode.prototype = {
 
   update: function (key, newValue) {
     if(this.kvPairs[key]) {
-      this.kvPairs[key] = {'key': key, 'val': newValue};
+      this.kvPairs[key] = newValue;
     }
   },
 
@@ -229,14 +254,38 @@ gossipNode.prototype = {
     delete this.kvPairs[key];
   },
 
+  /* returns the machine the key goes to*/
+  hashingFunc: function(key) {
+    keys = Object.keys(this.list);
+
+    var self = this;
+    var numMachines = 0;
+    console.log('Active Members:');
+    keys.forEach(function(ip) {
+      if(self.list[ip].status === 'Joined') {
+        numMachines++;
+      }
+    });
+    return key % numMachines;
+  },
+
   show: function () {
-    this.kvPairs.forEach(function (pair) {
-        console.log(pair.val);
+    var keys = Object.keys(this.kvPairs);
+    console.log('Keys:');
+    keys.forEach(function (key) {
+      console.log(' ' + key);
     });
 
-    this.list.forEach(function (connection) {
-      console.log(connection);
+    keys = Object.keys(this.list);
+
+    var self = this;
+    console.log('Active Members:');
+    keys.forEach(function(ip) {
+      if(self.list[ip].status === 'Joined') {
+        console.log(' ' + ip);
+      }
     });
+
   },
 
   updateList: function (recievedList) {
