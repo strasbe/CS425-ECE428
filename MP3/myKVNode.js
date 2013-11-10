@@ -226,9 +226,7 @@ gossipNode.prototype = {
   },
 
   delete: function(key) {
-    if(this.kvPairs[key]) {
-      this.kvPairs[key] = null;
-    }
+    delete this.kvPairs[key];
   },
 
   show: function () {
