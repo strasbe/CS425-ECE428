@@ -262,6 +262,16 @@ gossipNode.prototype = {
 
       this.list[ip] = { 'startTime': time, 'status': status, 'machineNum': machineNum };
 
+      keys = Object.keys(this.kvPairs);
+      keys.forEach(function(key) {
+        var newMachineNum = self.hashingFunc(key);
+        var currMachineNum = self.list[ipAddr].machineNum;
+        if(newMachineNum !== currMachineNum) {
+          self.eventEmitter.emit('insert', key, self.kvPairs[key], function () {});
+          self.delete(key);
+        }
+      });
+
       /* Don't log anything for contactNodeIP before recieving info from it */
       if(time !== 0) {
         this.writeToLog(ip, time, status);
