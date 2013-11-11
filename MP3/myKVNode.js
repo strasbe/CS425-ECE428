@@ -104,8 +104,15 @@ gossipNode.prototype = {
       }
     });
 
-    this.eventEmitter.on('lookup', function (key) {
-      console.log(self.lookup(key));
+    this.eventEmitter.on('lookup', function (key, addrInfo, cb) {
+      cb = cb || (function () {});
+      if(!addrInfo) {
+        console.log(self.lookup(key));
+      }
+      else if(self.lookup(key) !== undefined) {
+        var msg = new Buffer(JSON.stringify('found' + self.lookup(key)), 'utf-8');
+        self.sendSocket.send(msg, 0, msg.length, receivePort, addrInfo, cb);
+      }
     });
 
     this.eventEmitter.on('update', function (key, value, cb) {
@@ -152,7 +159,7 @@ gossipNode.prototype = {
 
     this.receiveSocket.on('message', function (msg, rinfo) {
         var received = JSON.parse(msg);
-        self.checkCmd(received);
+        self.checkCmd(received, rinfo.address);
         if(!(rinfo.address in self.ipList)) {
           self.ipList[rinfo.address] = { 'timer':setTimeout(self.connectionTimedOut(rinfo.address), timeout) };
         }
@@ -183,13 +190,13 @@ gossipNode.prototype = {
     }
   },
 
-  checkCmd: function (cmd) {
+  checkCmd: function (cmd, addrInfo) {
     var match = null;
     if (match = insertRegEx.exec(cmd)) {
       this.eventEmitter.emit('insert', match[1], match[2]);
     }
     else if (match = lookupRegEx.exec(cmd)) {
-      this.eventEmitter.emit('lookup', match[1]);
+      this.eventEmitter.emit('lookup', match[1], addrInfo);
     }
     else if (match = updateRegEx.exec(cmd)) {
       this.eventEmitter.emit('update', match[1], match[2]);
@@ -238,7 +245,8 @@ gossipNode.prototype = {
       randIp = keys[Math.floor(keys.length * Math.random())];
     } while(randIp && this.list[randIp].status !== 'Joined' &&
             this.list[randIp].status !== 0 &&
-            this.list[randIp].status !== 1);
+            this.list[randIp].status !== 1 &&
+            this.list[randIp].status !== 'Contact');
 
     /* Don't gossip with self */
     if(!randIp) {
@@ -254,7 +262,7 @@ gossipNode.prototype = {
       keys = Object.keys(this.list);
       keys.forEach(function(ip) {
         if(self.list[ip].status === 'Joined') {
-          if(self.list[ip].machineNum >= machineNum) {
+          if(self.list[ip].machineNum >= machineNum && machineNum >=0) {
             machineNum = self.list[ip].machineNum++;
           }
         }
@@ -286,7 +294,7 @@ gossipNode.prototype = {
         this.writeToLog(ip, time, status);
       }
     } /* Update Current IP Machine */
-    else if(this.list[ip].startTime === time && status !== 'Joined') {
+    else if(this.list[ip].startTime === time && status !== 'Joined' && status !== 'Contact') {
       this.list[ip].machineNum = -1;
       if(this.list[ip].status !== status) {
         if(status === 'Left' || status === 0) {
