@@ -16,7 +16,7 @@ var foundRegEx = /^found(.*)/;
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.1';
-var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
+var ipAddr = os.networkInterfaces().eth0[0].address;
 var timeout = 500;
 var sendDelay = 10;
 var currNodeIpAddr;
