@@ -6,10 +6,10 @@ var os = require('os');
 var EventEmitter = require('events').EventEmitter;
 
 var exitRegEx = /^exit.*/;
-var insertRegEx = /^insert ([0-9]+) (.*)/;
-var lookupRegEx = /^lookup ([0-9]+)/;
-var updateRegEx = /^update ([0-9]+) (.*)/;
-var deleteRegEx = /^delete ([0-9]+)/;
+var insertRegEx = /^insert (.*) (.*)/;
+var lookupRegEx = /^lookup (.*)/;
+var updateRegEx = /^update (.*) (.*)/;
+var deleteRegEx = /^delete (.*)/;
 var showRegEx = /^show.*/;
 
 var sendPort = 8000;
@@ -325,7 +325,11 @@ gossipNode.prototype = {
   },
 
   insert: function (key, value) {
-    this.kvPairs[key] = value;
+    if(typeof(this.kvPairs[key]) === 'undefined'){
+      this.kvPairs[key] = [];
+    }
+
+    this.kvPairs[key].push(value);
   },
 
   /* returns value from key */
@@ -354,6 +358,10 @@ gossipNode.prototype = {
         numMachines++;
       }
     });
+
+    if(typeof(key) === 'string') {
+      key = key.charCodeAt(0);
+    }
     var destMachine = key % numMachines;
     keys = Object.keys(self.list);
     var found = false;
@@ -375,7 +383,7 @@ gossipNode.prototype = {
   },
 
   show: function () {
-    console.log(this.list);
+    // console.log(this.list);
     var keys = Object.keys(this.kvPairs);
     console.log('Keys:');
     keys.forEach(function (key) {

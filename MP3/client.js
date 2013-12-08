@@ -6,17 +6,17 @@ var os = require('os');
 var EventEmitter = require('events').EventEmitter;
 
 var exitRegEx = /^exit.*/;
-var insertRegEx = /^insert ([0-9]+) (.*)/;
-var lookupRegEx = /^lookup ([0-9]+)/;
-var updateRegEx = /^update ([0-9]+) (.*)/;
-var deleteRegEx = /^delete ([0-9]+)/;
+var insertRegEx = /^insert (.*) (.*)/;
+var lookupRegEx = /^lookup (.*)/;
+var updateRegEx = /^update (.*) (.*)/;
+var deleteRegEx = /^delete (.*)/;
 var showRegEx = /^show.*/;
 var foundRegEx = /^found(.*)/;
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.1';
-var ipAddr = os.networkInterfaces().eth0[0].address;
+var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
 var timeout = 500;
 var sendDelay = 10;
 var currNodeIpAddr;
@@ -92,6 +92,7 @@ gossipNode.prototype = {
                 destIp = ip;
               }
         });
+
         var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + value), 'utf-8');
         self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
     });
@@ -194,7 +195,11 @@ gossipNode.prototype = {
       this.eventEmitter.emit('show');
     }
     else if(match = foundRegEx.exec(cmd)) {
-      console.log(match[1]);
+      console.log();
+      var list = match[1].split(",");
+      list.forEach(function(title) {
+        console.log(title);
+      });
     }
   },
 
@@ -284,6 +289,11 @@ gossipNode.prototype = {
         numMachines++;
       }
     });
+
+    if(typeof(key) === 'string') {
+      key = key.charCodeAt(0);
+    }
+
     var destMachine = key % numMachines;
     keys = Object.keys(self.list);
     var found = false;
