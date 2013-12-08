@@ -328,7 +328,7 @@ gossipNode.prototype = {
   },
 
   insert: function (key, value) {
-    // if(typeof(this.kvPairs[key]) === 'undefined'){
+    // if(typeof(this.kvPairs[key]) === 'undefined') {
     //   this.kvPairs[key] = [];
     // }
 
@@ -349,7 +349,7 @@ gossipNode.prototype = {
 
     // this.kvPairs[key].push(newValue);
     this.kvPairs[key] = value;
-    
+
   },
 
   delete: function(key) {

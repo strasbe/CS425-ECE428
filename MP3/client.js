@@ -7,13 +7,18 @@ var EventEmitter = require('events').EventEmitter;
 var movieFile = "./movies.list"
 
 var exitRegEx = /^exit.*/;
-var insertRegEx = /^insert (.*) (.*)/;
-var lookupRegEx = /^lookup (.*)/;
-var updateRegEx = /^update (.*) (.*)/;
+var insertRegEx = /^insert(?:\s([a-zA-Z0-9]+))(?:\s([a-zA-Z0-9]+))(?:\s([a-zA-Z0-9]+))?/;
+var lookupRegEx = /^lookup(?:\s([a-zA-Z0-9]+))(?:\s([a-zA-Z0-9]+))?/;
+var updateRegEx = /^update(?:\s([a-zA-Z0-9]+))(?:\s([a-zA-Z0-9]+))(?:\s([a-zA-Z0-9]+))?/;
 var deleteRegEx = /^delete (.*)/;
 var showRegEx = /^show.*/;
 var foundRegEx = /^found(.*)/;
 var movieRegEx = /^movie.*/;
+var oneRegEx = /.*(ONE).*/;
+var allRegEx = /.*(ALL).*/;
+var quarRegEx = /.*(QUORUM).*/;
+var foundCounter = 0;
+
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
@@ -123,18 +128,50 @@ gossipNode.prototype = {
       });
     });
 
-    this.eventEmitter.on('lookup', function (key, cb) {
+    this.eventEmitter.on('lookup', function (key, concurrency, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = 0;
+
+      var numMachines = 0;
+      keys.forEach(function(ip) {
+        if(self.list[ip].status === 'Joined') {
+          numMachines++;
+        }
+      });
+
+      if( (match = oneRegEx.exec(concurrency)) || !concurrency) {
+        foundCounter = 1;
+        var destMachine = self.hashingFunc(key);
+        var destIp = 0;
+          keys = Object.keys(self.list);
+          keys.forEach(function(ip) {
+                if(self.list[ip].machineNum === destMachine) {
+                  destIp = ip;
+                }
+          });
+          var msg = new Buffer(JSON.stringify('lookup ' + key), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      }
+      else if(match = allRegEx.exec(concurrency)) {
+        foundCounter = numMachines;
+        var destMachine = self.hashingFunc(key);
+        var destIp = 0;
         keys = Object.keys(self.list);
         keys.forEach(function(ip) {
-              if(self.list[ip].machineNum === destMachine) {
-                destIp = ip;
-              }
+          var msg = new Buffer(JSON.stringify('lookup ' + key), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
         });
-        var msg = new Buffer(JSON.stringify('lookup ' + key), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+        
+      }
+      else if(match = quarRegEx.exec(concurrency)) {
+        foundCounter = numMachines;
+        var destMachine = self.hashingFunc(key);
+        var destIp = 0;
+        keys = Object.keys(self.list);
+        keys.forEach(function(ip) {
+          var msg = new Buffer(JSON.stringify('lookup ' + key), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
+        });
+      }
     });
 
     this.eventEmitter.on('update', function (key, value, cb) {
@@ -169,7 +206,6 @@ gossipNode.prototype = {
       cb = cb || (function () {});
       if(oldMachine) {
         if(self.list[oldMachine].status === 'Joined') {
-          console.log('sending');
           var msg = new Buffer(JSON.stringify('join ' + newMachine), 'utf-8');
           self.sendSocket.send(msg, 0, msg.length, receivePort, oldMachine, cb);
         }
@@ -215,7 +251,7 @@ gossipNode.prototype = {
       this.eventEmitter.emit('insert', match[1], match[2]);
     }
     else if (match = lookupRegEx.exec(cmd)) {
-      this.eventEmitter.emit('lookup', match[1]);
+      this.eventEmitter.emit('lookup', match[1], match[2]);
     }
     else if (match = updateRegEx.exec(cmd)) {
       this.eventEmitter.emit('update', match[1], match[2]);
@@ -227,11 +263,13 @@ gossipNode.prototype = {
       this.eventEmitter.emit('show');
     }
     else if(match = foundRegEx.exec(cmd)) {
-      console.log();
-      var list = match[1].split(",");
-      list.forEach(function(title) {
-        console.log(title);
-      });
+      foundCounter--;
+      if(foundCounter === 0) {
+        var list = match[1].split(",");
+        list.forEach(function(title) {
+          console.log(title);
+        });
+      }
     }
   },
 
