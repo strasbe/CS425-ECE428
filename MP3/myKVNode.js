@@ -5,19 +5,24 @@ var readline = require('readline');
 var os = require('os');
 var EventEmitter = require('events').EventEmitter;
 
+var movieFile = "./movies.list"
+
+var movieRegEx = /^movie.*/;
+
 var exitRegEx = /^exit.*/;
 var insertRegEx = /^insert (.*) (.*)/;
 var lookupRegEx = /^lookup (.*)/;
 var updateRegEx = /^update (.*) (.*)/;
 var deleteRegEx = /^delete (.*)/;
 var showRegEx = /^show.*/;
+var joinRegEx = /^join (.*)/;
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.1';
 var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
-var timeout = 500;
-var sendDelay = 10;
+var timeout = 5000;
+var sendDelay = 100;
 var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
@@ -70,6 +75,33 @@ gossipNode.prototype = {
 
   },
 
+  readMovieFile: function(){
+    var self = this;
+    var tmp = 0;
+    fs.readFile(movieFile, 'utf8', function(err, data){
+      if(err){
+        return console.log(err);
+      }
+      var lineByLine = data.split("\n");
+      lineByLine.forEach(function(line){
+        tmp++;
+        var title = line.split("\"");
+        var wordSplit = null;
+        if(title[1]){
+          wordSplit = title[1].split(" ");
+        }
+        // if(tmp > 590200 && tmp < 590300) {
+          if(wordSplit !== null){
+            wordSplit.forEach(function(word){
+              self.insert(word, title[1]);
+            });
+        // }
+        }
+      });
+    });
+    timeout = 2000;
+  },
+
   /* All event handling */
   events: function () {
     var self = this;
@@ -87,21 +119,7 @@ gossipNode.prototype = {
 
     this.eventEmitter.on('insert', function (key, value, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = 0;
-      if(destMachine === self.list[ipAddr].machineNum) {
-        self.insert(key,value);
-      }
-      else {
-        keys = Object.keys(self.list);
-        keys.forEach(function(ip) {
-              if(self.list[ip].machineNum === destMachine) {
-                destIp = ip;
-              }
-        });
-        var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + value), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
-      }
+      self.insert(key,value);
     });
 
     this.eventEmitter.on('lookup', function (key, addrInfo, cb) {
@@ -117,44 +135,25 @@ gossipNode.prototype = {
 
     this.eventEmitter.on('update', function (key, value, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = contactNodeIP;
-      if(destMachine === self.list[ipAddr].machineNum) {
-        self.update(key,value);
-      }
-      else {
-        keys = Object.keys(self.list);
-        keys.forEach(function(ip) {
-              if(self.list[ip].machineNum === destMachine) {
-                destIp = ip;
-              }
-        });
-        var msg = new Buffer(JSON.stringify('update ' + key + ' ' + value), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
-      }
+      self.update(key,value);
     });
 
     this.eventEmitter.on('delete', function (key, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = contactNodeIP;
-      if(destMachine === self.list[ipAddr].machineNum) {
-        self.delete(key);
-      }
-      else {
-        keys = Object.keys(self.list);
-        keys.forEach(function(ip) {
-              if(self.list[ip].machineNum === destMachine) {
-                destIp = ip;
-              }
-        });
-        var msg = new Buffer(JSON.stringify('delete ' + key), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
-      }
+      self.delete(key);
     });
 
     this.eventEmitter.on('show', function () {
       self.show();
+    });
+
+    this.eventEmitter.on('join', function (destIp, cb) {
+      cb = cb || (function () {});
+      keys = Object.keys(self.kvPairs);
+      keys.forEach(function(key) {
+        var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + self.kvPairs[key]), 'utf-8');
+        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      });
     });
 
     this.receiveSocket.on('message', function (msg, rinfo) {
@@ -206,6 +205,12 @@ gossipNode.prototype = {
     }
     else if(match = showRegEx.exec(cmd)) {
       this.eventEmitter.emit('show');
+    }
+    else if(match = joinRegEx.exec(cmd)) {
+      this.eventEmitter.emit('join', match[1]);
+    }
+    else if(match = movieRegEx.exec(cmd)) {
+      this.readMovieFile();
     }
   },
 
@@ -276,7 +281,6 @@ gossipNode.prototype = {
         var currMachineNum = self.list[ipAddr].machineNum;
         if(newMachineNum !== currMachineNum) {
           self.eventEmitter.emit('insert', key, self.kvPairs[key], function () {});
-          self.delete(key);
         }
       });
 
@@ -303,7 +307,6 @@ gossipNode.prototype = {
             keys = Object.keys(this.kvPairs);
             keys.forEach(function(key) {
                 self.eventEmitter.emit('insert', key, self.kvPairs[key], function () {});
-                self.delete(key);
             });
           }
         }
@@ -325,11 +328,12 @@ gossipNode.prototype = {
   },
 
   insert: function (key, value) {
-    if(typeof(this.kvPairs[key]) === 'undefined'){
-      this.kvPairs[key] = [];
-    }
+    // if(typeof(this.kvPairs[key]) === 'undefined'){
+    //   this.kvPairs[key] = [];
+    // }
 
-    this.kvPairs[key].push(value);
+    // this.kvPairs[key].push(value);
+    this.kvPairs[key] = value;
   },
 
   /* returns value from key */
@@ -338,9 +342,14 @@ gossipNode.prototype = {
   },
 
   update: function (key, newValue) {
-    if(this.kvPairs[key]) {
-      this.kvPairs[key] = newValue;
-    }
+    // delete this.kvPairs[key];
+    // if(typeof(this.kvPairs[key]) === 'undefined'){
+    //   this.kvPairs[key] = [];
+    // }
+
+    // this.kvPairs[key].push(newValue);
+    this.kvPairs[key] = value;
+    
   },
 
   delete: function(key) {

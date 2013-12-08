@@ -4,6 +4,7 @@ var _ = require('underscore');
 var readline = require('readline');
 var os = require('os');
 var EventEmitter = require('events').EventEmitter;
+var movieFile = "./movies.list"
 
 var exitRegEx = /^exit.*/;
 var insertRegEx = /^insert (.*) (.*)/;
@@ -12,13 +13,14 @@ var updateRegEx = /^update (.*) (.*)/;
 var deleteRegEx = /^delete (.*)/;
 var showRegEx = /^show.*/;
 var foundRegEx = /^found(.*)/;
+var movieRegEx = /^movie.*/;
 
 var sendPort = 8000;
 var receivePort = sendPort + 1;
 var contactNodeIP = '127.0.0.1';
 var ipAddr = process.argv[2];//os.networkInterfaces().eth0[0].address;
-var timeout = 500;
-var sendDelay = 10;
+var timeout = 5000;
+var sendDelay = 100;
 var currNodeIpAddr;
 var intervalTimer;
 var filename = 'machine.' + ipAddr + '.log';
@@ -38,7 +40,6 @@ function gossipNode() {
     currNodeIpAddr = self.getRandomIpAddr();
     self.gossip(currNodeIpAddr);
   }, sendDelay);
-
   this.events();
 }
 
@@ -70,6 +71,33 @@ gossipNode.prototype = {
 
   },
 
+  readMovieFile: function(){
+    var self = this;
+    var tmp = 0;
+    fs.readFile(movieFile, 'utf8', function(err, data){
+      if(err){
+        return console.log(err);
+      }
+      var lineByLine = data.split("\n");
+      lineByLine.forEach(function(line){
+        tmp++;
+        var title = line.split("\"");
+        var wordSplit = null;
+        if(title[1]){
+          wordSplit = title[1].split(" ");
+        }
+        if(tmp > 590200 && tmp < 590200) {
+          if(wordSplit !== null){
+            wordSplit.forEach(function(word){
+              console.log(word);
+              self.eventEmitter.emit('insert', title[1], word);
+            });
+        }
+        }
+      });
+    });
+  },
+
   /* All event handling */
   events: function () {
     var self = this;
@@ -84,17 +112,15 @@ gossipNode.prototype = {
 
     this.eventEmitter.on('insert', function (key, value, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = 0;
-        keys = Object.keys(self.list);
-        keys.forEach(function(ip) {
-              if(self.list[ip].machineNum === destMachine) {
-                destIp = ip;
-              }
-        });
 
-        var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + value), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
+      keys = Object.keys(self.list);
+
+      keys.forEach(function(ip) {
+        if(self.list[ip].status === 'Joined') {
+          var msg = new Buffer(JSON.stringify('insert ' + key + ' ' + value), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
+        }
+      });
     });
 
     this.eventEmitter.on('lookup', function (key, cb) {
@@ -113,35 +139,41 @@ gossipNode.prototype = {
 
     this.eventEmitter.on('update', function (key, value, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = contactNodeIP;
-
       keys = Object.keys(self.list);
+
       keys.forEach(function(ip) {
-            if(self.list[ip].machineNum === destMachine) {
-              destIp = ip;
-            }
+        if(self.list[ip].status === 'Joined') {
+          var msg = new Buffer(JSON.stringify('update ' + key + ' ' + value), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
+        }
       });
-      var msg = new Buffer(JSON.stringify('update ' + key + ' ' + value), 'utf-8');
-        self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
     });
 
     this.eventEmitter.on('delete', function (key, cb) {
       cb = cb || (function () {});
-      var destMachine = self.hashingFunc(key);
-      var destIp = contactNodeIP;
       keys = Object.keys(self.list);
+
       keys.forEach(function(ip) {
-            if(self.list[ip].machineNum === destMachine) {
-              destIp = ip;
-            }
+        if(self.list[ip].status === 'Joined') {
+          var msg = new Buffer(JSON.stringify('delete ' + key), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, ip, cb);
+        }
       });
-      var msg = new Buffer(JSON.stringify('delete ' + key), 'utf-8');
-      self.sendSocket.send(msg, 0, msg.length, receivePort, destIp, cb);
     });
 
     this.eventEmitter.on('show', function () {
       self.show();
+    });
+
+    this.eventEmitter.on('join', function (newMachine, oldMachine, cb) {
+      cb = cb || (function () {});
+      if(oldMachine) {
+        if(self.list[oldMachine].status === 'Joined') {
+          console.log('sending');
+          var msg = new Buffer(JSON.stringify('join ' + newMachine), 'utf-8');
+          self.sendSocket.send(msg, 0, msg.length, receivePort, oldMachine, cb);
+        }
+      }
     });
 
     this.receiveSocket.on('message', function (msg, rinfo) {
@@ -240,22 +272,43 @@ gossipNode.prototype = {
     var self = this;
     /* New IP address */
     if(!(ip in this.list)) {
+      var oldest = Number.MAX_VALUE;
+      var oldestIp = 0;
       keys = Object.keys(this.list);
-      keys.forEach(function(ip) {
-        if(self.list[ip].status === 'Joined') {
-          if(self.list[ip].machineNum >= machineNum && machineNum >=0) {
-            machineNum = self.list[ip].machineNum++;
+      keys.forEach(function(ipIt) {
+        if(self.list[ipIt].status === 'Joined') {
+          if(self.list[ipIt].startTime < oldest) {
+            oldest = self.list[ipIt].startTime;
+            oldestIp = ipIt;
+          }
+          if(self.list[ipIt].machineNum >= machineNum && machineNum >=0) {
+            machineNum = self.list[ipIt].machineNum++;
           }
         }
       });
-
       this.list[ip] = { 'startTime': time, 'status': status, 'machineNum': machineNum };
-
+      
+      if(oldestIp) {
+        self.eventEmitter.emit('join', ip, oldestIp);
+      }
     } /* Reincarnation of previously used IP */
     else if(this.list[ip].startTime < time) {
       this.list[ip].startTime = time;
       this.list[ip].status = status;
-
+      keys = Object.keys(this.list);
+      var oldest = Number.MAX_VALUE;
+      var oldestIp = 0;
+      keys.forEach(function(ipIter) {
+        if(self.list[ipIter].status === 'Joined') {
+          if(self.list[ipIter].startTime < oldest) {
+            oldest = self.list[ipIter].startTime;
+            oldestIp = ipIter;
+          }
+        }
+      });
+      if(oldestIp) {
+        self.eventEmitter.emit('join', ip, oldestIp);
+      }
     } /* Update Current IP Machine */
     else if(this.list[ip].startTime === time && status !== 'Joined' && status !== 'Contact') {
       this.list[ip].machineNum = -1;
